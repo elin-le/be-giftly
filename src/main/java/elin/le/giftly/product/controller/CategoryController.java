@@ -4,6 +4,8 @@ import elin.le.giftly.common.dto.ApiResponse;
 import elin.le.giftly.product.dto.CategoryResponse;
 import elin.le.giftly.product.entity.Category;
 import elin.le.giftly.product.repository.CategoryRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,11 +17,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
+@Tag(name = "Categories", description = "Product category browsing APIs")
 public class CategoryController {
 
     private final CategoryRepository categoryRepository;
 
     @GetMapping
+    @Operation(summary = "Get all categories", description = "Retrieve all product categories available in the store")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
         List<Category> categories = categoryRepository.findAll();
         List<CategoryResponse> response = categories.stream()

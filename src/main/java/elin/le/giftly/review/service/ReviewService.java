@@ -1,6 +1,8 @@
 package elin.le.giftly.review.service;
 
+import elin.le.giftly.cloudinary.service.CloudinaryService;
 import elin.le.giftly.common.enums.OrderStatus;
+import elin.le.giftly.common.enums.ReviewStatus;
 import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.order.entity.Order;
@@ -12,31 +14,44 @@ import elin.le.giftly.product.entity.ProductImage;
 import elin.le.giftly.review.dto.CreateReviewRequest;
 import elin.le.giftly.review.dto.ReviewResponse;
 import elin.le.giftly.review.entity.Review;
+import elin.le.giftly.review.entity.ReviewImage;
 import elin.le.giftly.review.repository.ReviewRepository;
 import elin.le.giftly.user.entity.User;
 import elin.le.giftly.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final CloudinaryService cloudinaryService;
+    private final Cloudinary cloudinary;
 
     @Transactional
-    public ReviewResponse createReview(CreateReviewRequest request) {
+    public ReviewResponse createReview(CreateReviewRequest request, MultipartFile imageFile) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         UUID userId = getCurrentUserId(email);
 
@@ -62,17 +77,55 @@ public class ReviewService {
             throw new BadRequestException("You have already reviewed this item");
         }
 
-        // Build and save the review
+        // Build the review with status PENDING
         Review review = Review.builder()
                 .userId(userId)
                 .product(orderItem.getProduct())
                 .orderItem(orderItem)
-                .rating(request.rating())
+                .rating(request.rating().shortValue())
+                .title(request.title())
                 .comment(request.comment())
+                .status(ReviewStatus.PENDING)
                 .build();
 
         review = reviewRepository.save(review);
+
+        // Handle image upload if provided
+        if (imageFile != null && !imageFile.isEmpty()) {
+            uploadReviewImage(review, imageFile);
+        } else if (request.imageUrl() != null && !request.imageUrl().isEmpty()) {
+            // If imageUrl is provided directly, create ReviewImage entity
+            ReviewImage reviewImage = ReviewImage.builder()
+                    .review(review)
+                    .imageUrl(request.imageUrl())
+                    .build();
+            review.setReviewImage(reviewImage);
+            reviewRepository.save(review);
+        }
+
         return toReviewResponse(review);
+    }
+
+    private void uploadReviewImage(Review review, MultipartFile imageFile) {
+        try {
+            Map<String, Object> uploadParams = new HashMap<>();
+            uploadParams.put("folder", "giftly/reviews");
+            
+            Map<String, Object> uploadResult = cloudinary.uploader().upload(imageFile.getBytes(), uploadParams);
+            
+            ReviewImage reviewImage = ReviewImage.builder()
+                    .review(review)
+                    .imageUrl((String) uploadResult.get("secure_url"))
+                    .publicId((String) uploadResult.get("public_id"))
+                    .build();
+            
+            review.setReviewImage(reviewImage);
+            reviewRepository.save(review);
+            log.info("Successfully uploaded review image for review: {}", review.getId());
+        } catch (Exception e) {
+            log.error("Failed to upload review image for review: {}", review.getId(), e);
+            throw new BadRequestException("Failed to upload review image");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -87,12 +140,16 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getMyReviews() {
+    public Page<ReviewResponse> getReviewsByProductAndRating(UUID productId, Short rating, Pageable pageable) {
+        return reviewRepository.findByProductIdAndRating(productId, rating, pageable).map(this::toReviewResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> getMyReviews(Pageable pageable) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         UUID userId = getCurrentUserId(email);
 
-        Page<Review> reviews = reviewRepository.findByUserId(userId, Pageable.unpaged());
-        return reviews.getContent().stream().map(this::toReviewResponse).toList();
+        return reviewRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable).map(this::toReviewResponse);
     }
 
     @Transactional(readOnly = true)
@@ -114,6 +171,11 @@ public class ReviewService {
             throw new AccessDeniedException("You can only delete your own reviews");
         }
 
+        // Delete associated image from Cloudinary if exists
+        if (review.getReviewImage() != null && review.getReviewImage().getPublicId() != null) {
+            cloudinaryService.deleteImage(review.getReviewImage().getPublicId());
+        }
+
         reviewRepository.delete(review);
     }
 
@@ -131,14 +193,23 @@ public class ReviewService {
             );
         }
 
+        String reviewImageUrl = null;
+        if (review.getReviewImage() != null) {
+            reviewImageUrl = review.getReviewImage().getImageUrl();
+        }
+
         return new ReviewResponse(
                 review.getId(),
                 review.getUserId(),
                 user != null ? user.getEmail() : null,
                 productInfo,
-                review.getRating(),
+                review.getRating() != null ? review.getRating().intValue() : null,
+                review.getTitle(),
                 review.getComment(),
-                review.getCreatedAt()
+                review.getStatus(),
+                reviewImageUrl,
+                review.getCreatedAt(),
+                review.getUpdatedAt()
         );
     }
 

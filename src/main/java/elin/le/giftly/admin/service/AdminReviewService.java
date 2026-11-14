@@ -1,5 +1,8 @@
 package elin.le.giftly.admin.service;
 
+import elin.le.giftly.cloudinary.service.CloudinaryService;
+import elin.le.giftly.common.enums.ReviewStatus;
+import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.product.entity.ProductImage;
 import elin.le.giftly.review.dto.ReviewResponse;
@@ -21,9 +24,27 @@ public class AdminReviewService {
 
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Transactional(readOnly = true)
-    public Page<ReviewResponse> getAllReviews(Pageable pageable) {
+    public Page<ReviewResponse> getAllReviews(
+            UUID productId,
+            UUID userId,
+            ReviewStatus status,
+            Pageable pageable) {
+        
+        if (productId != null && status != null) {
+            return reviewRepository.findByProductIdAndStatus(productId, status, pageable).map(this::toReviewResponse);
+        }
+        if (productId != null) {
+            return reviewRepository.findByProductId(productId, pageable).map(this::toReviewResponse);
+        }
+        if (userId != null) {
+            return reviewRepository.findByUserId(userId, pageable).map(this::toReviewResponse);
+        }
+        if (status != null) {
+            return reviewRepository.findByStatusOrderByCreatedAtDesc(status, pageable).map(this::toReviewResponse);
+        }
         return reviewRepository.findAll(pageable).map(this::toReviewResponse);
     }
 
@@ -44,6 +65,28 @@ public class AdminReviewService {
         return toReviewResponse(review);
     }
 
+    @Transactional
+    public void updateReviewStatus(UUID reviewId, ReviewStatus status) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
+        
+        review.setStatus(status);
+        reviewRepository.save(review);
+    }
+
+    @Transactional
+    public void deleteReview(UUID reviewId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
+
+        // Delete associated image from Cloudinary if exists
+        if (review.getReviewImage() != null && review.getReviewImage().getPublicId() != null) {
+            cloudinaryService.deleteImage(review.getReviewImage().getPublicId());
+        }
+
+        reviewRepository.delete(review);
+    }
+
     private ReviewResponse toReviewResponse(Review review) {
         User user = userRepository.findById(review.getUserId()).orElse(null);
 
@@ -57,14 +100,23 @@ public class AdminReviewService {
             );
         }
 
+        String reviewImageUrl = null;
+        if (review.getReviewImage() != null) {
+            reviewImageUrl = review.getReviewImage().getImageUrl();
+        }
+
         return new ReviewResponse(
                 review.getId(),
                 review.getUserId(),
                 user != null ? user.getEmail() : null,
                 productInfo,
-                review.getRating(),
+                review.getRating() != null ? review.getRating().intValue() : null,
+                review.getTitle(),
                 review.getComment(),
-                review.getCreatedAt()
+                review.getStatus(),
+                reviewImageUrl,
+                review.getCreatedAt(),
+                review.getUpdatedAt()
         );
     }
 

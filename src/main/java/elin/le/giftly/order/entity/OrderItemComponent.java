@@ -1,5 +1,6 @@
 package elin.le.giftly.order.entity;
 
+import elin.le.giftly.product.entity.Product;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,18 +21,21 @@ public class OrderItemComponent {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_item_id", nullable = false)
+    @JoinColumn(name = "order_item_id")
     private OrderItem orderItem;
 
-    @Column(name = "component_name", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
+
+    @Column(name = "component_name")
     private String componentName;
 
-    @Column(name = "component_type", nullable = false)
+    @Column(name = "component_type")
     private String componentType;
 
-    @Column(name = "unit_price", nullable = false, precision = 19, scale = 2)
+    @Column(name = "unit_price", precision = 19, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(nullable = false)
     private Integer quantity;
 }

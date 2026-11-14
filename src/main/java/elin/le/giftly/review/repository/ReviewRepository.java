@@ -1,5 +1,6 @@
 package elin.le.giftly.review.repository;
 
+import elin.le.giftly.common.enums.ReviewStatus;
 import elin.le.giftly.review.entity.Review;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +17,8 @@ import java.util.UUID;
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
     Page<Review> findByProductId(UUID productId, Pageable pageable);
     Page<Review> findByUserId(UUID userId, Pageable pageable);
+    Page<Review> findByStatus(ReviewStatus status, Pageable pageable);
+    Page<Review> findByProductIdAndStatus(UUID productId, ReviewStatus status, Pageable pageable);
     
     Optional<Review> findByOrderItemId(UUID orderItemId);
     boolean existsByOrderItemId(UUID orderItemId);
@@ -27,4 +30,19 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     
     @Query("SELECT COUNT(r) FROM Review r WHERE r.product.id = :productId")
     long countByProductId(@Param("productId") UUID productId);
+
+    @Query("SELECT COALESCE(AVG(r.rating), 0.0) FROM Review r WHERE r.product.id = :productId AND r.status = :status")
+    double findAverageRatingByProductIdAndStatus(@Param("productId") UUID productId, @Param("status") ReviewStatus status);
+
+    @Query("SELECT r FROM Review r WHERE r.product.id = :productId ORDER BY r.rating DESC")
+    Page<Review> findByProductIdOrderByRatingDesc(@Param("productId") UUID productId, Pageable pageable);
+
+    @Query("SELECT r FROM Review r WHERE r.userId = :userId ORDER BY r.createdAt DESC")
+    Page<Review> findByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId, Pageable pageable);
+
+    @Query("SELECT r FROM Review r WHERE r.product.id = :productId AND r.rating = :rating ORDER BY r.createdAt DESC")
+    Page<Review> findByProductIdAndRating(@Param("productId") UUID productId, @Param("rating") Short rating, Pageable pageable);
+
+    @Query("SELECT r FROM Review r WHERE r.status = :status ORDER BY r.createdAt DESC")
+    Page<Review> findByStatusOrderByCreatedAtDesc(@Param("status") ReviewStatus status, Pageable pageable);
 }
