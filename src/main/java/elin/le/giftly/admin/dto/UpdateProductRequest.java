@@ -23,5 +23,5 @@ public record UpdateProductRequest(
 
     ProductStatus status,
 
-    List<String> imageUrls
+    List<ImageInfo> images
 ) {}

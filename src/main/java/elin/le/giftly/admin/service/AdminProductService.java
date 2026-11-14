@@ -1,7 +1,9 @@
 package elin.le.giftly.admin.service;
 
 import elin.le.giftly.admin.dto.CreateProductRequest;
+import elin.le.giftly.admin.dto.ImageInfo;
 import elin.le.giftly.admin.dto.UpdateProductRequest;
+import elin.le.giftly.cloudinary.service.CloudinaryService;
 import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.common.enums.ProductType;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
@@ -17,7 +19,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -27,6 +31,7 @@ public class AdminProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductImageRepository productImageRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Transactional(readOnly = true)
     public Page<Product> getAllProducts(Pageable pageable) {
@@ -71,14 +76,14 @@ public class AdminProductService {
 
         product = productRepository.save(product);
 
-        if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
+        if (request.images() != null && !request.images().isEmpty()) {
             Product savedProduct = product;
-            List<ProductImage> images = request.imageUrls().stream()
-                .map(url -> ProductImage.builder()
+            List<ProductImage> images = request.images().stream()
+                .map(info -> ProductImage.builder()
                     .product(savedProduct)
-                    .imageUrl(url)
-                    .secureUrl(url)
-                    .publicId(url)
+                    .imageUrl(info.secureUrl())
+                    .secureUrl(info.secureUrl())
+                    .publicId(info.publicId())
                     .isThumbnail(false)
                     .build())
                 .toList();
@@ -118,20 +123,48 @@ public class AdminProductService {
             product.setStatus(request.status());
         }
 
-        if (request.imageUrls() != null) {
+        if (request.images() != null) {
+            // Get current images
+            List<ProductImage> oldImages = productImageRepository.findByProductId(productId);
+            Set<String> oldPublicIds = new HashSet<>();
+            for (ProductImage img : oldImages) {
+                oldPublicIds.add(img.getPublicId());
+            }
+
+            // Build set of new public IDs
+            Set<String> newPublicIds = new HashSet<>();
+            if (request.images() != null) {
+                for (ImageInfo info : request.images()) {
+                    newPublicIds.add(info.publicId());
+                }
+            }
+
+            // Find images that were removed (in old but not in new) and delete from Cloudinary
+            Set<String> removedPublicIds = new HashSet<>(oldPublicIds);
+            removedPublicIds.removeAll(newPublicIds);
+            if (!removedPublicIds.isEmpty()) {
+                cloudinaryService.deleteImages(removedPublicIds.stream().toList());
+            }
+
+            // Find images that are new (in new but not in old)
+            Set<String> addedPublicIds = new HashSet<>(newPublicIds);
+            addedPublicIds.removeAll(oldPublicIds);
+
+            // Delete all old DB images and recreate from the new list
             productImageRepository.deleteByProductId(productId);
+
             Product savedProduct = product;
-            List<ProductImage> images = request.imageUrls().stream()
-                .map(url -> ProductImage.builder()
+            List<ProductImage> newImages = request.images().stream()
+                .map(info -> ProductImage.builder()
                     .product(savedProduct)
-                    .imageUrl(url)
-                    .secureUrl(url)
-                    .publicId(url)
+                    .imageUrl(info.secureUrl())
+                    .secureUrl(info.secureUrl())
+                    .publicId(info.publicId())
                     .isThumbnail(false)
                     .build())
                 .toList();
-            productImageRepository.saveAll(images);
-            product.setImages(images);
+            productImageRepository.saveAll(newImages);
+            product.setImages(newImages);
         }
 
         return productRepository.save(product);
@@ -141,6 +174,14 @@ public class AdminProductService {
     public void deleteProduct(UUID productId) {
         if (!productRepository.existsById(productId)) {
             throw new ResourceNotFoundException("Product", "id", productId);
+        }
+        // Delete all product images from Cloudinary before removing from DB
+        List<ProductImage> images = productImageRepository.findByProductId(productId);
+        if (!images.isEmpty()) {
+            List<String> publicIds = images.stream()
+                .map(ProductImage::getPublicId)
+                .toList();
+            cloudinaryService.deleteImages(publicIds);
         }
         productRepository.deleteById(productId);
     }

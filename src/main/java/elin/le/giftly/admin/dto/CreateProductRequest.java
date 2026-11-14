@@ -31,5 +31,5 @@ public record CreateProductRequest(
     @NotNull(message = "Product status is required")
     ProductStatus status,
 
-    List<String> imageUrls
+    List<ImageInfo> images
 ) {}
