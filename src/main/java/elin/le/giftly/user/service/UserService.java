@@ -1,5 +1,6 @@
 package elin.le.giftly.user.service;
 
+import elin.le.giftly.common.mapper.UserMapper;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.user.dto.UpdateUserRequest;
 import elin.le.giftly.user.dto.UserResponse;
@@ -15,13 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-        return mapToResponse(user);
+        return userMapper.toResponse(user);
     }
 
     @Transactional
@@ -38,17 +40,6 @@ public class UserService {
         }
 
         user = userRepository.save(user);
-        return mapToResponse(user);
-    }
-
-    private UserResponse mapToResponse(User user) {
-        return new UserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getPhone(),
-                user.getStatus(),
-                user.getCreatedAt()
-        );
+        return userMapper.toResponse(user);
     }
 }
