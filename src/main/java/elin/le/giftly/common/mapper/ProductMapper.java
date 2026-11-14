@@ -3,8 +3,11 @@ package elin.le.giftly.common.mapper;
 import elin.le.giftly.product.dto.ProductResponse;
 import elin.le.giftly.product.entity.Product;
 import elin.le.giftly.product.entity.ProductImage;
+import elin.le.giftly.review.repository.ReviewRepository;
+import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -15,6 +18,8 @@ public interface ProductMapper {
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "images", ignore = true)
+    @Mapping(target = "averageRating", ignore = true)
+    @Mapping(target = "reviewCount", ignore = true)
     ProductResponse toResponse(Product product);
 
     default ProductResponse toResponseWithDetails(Product product) {
@@ -28,7 +33,7 @@ public interface ProductMapper {
                 ? toImageResponseList(product.getImages()) : List.of();
         return new ProductResponse(
                 base.id(), base.name(), base.description(), base.price(),
-                base.stockQuantity(), productType, status, category, images
+                base.stockQuantity(), productType, status, category, images, 0.0, 0L
         );
     }
 

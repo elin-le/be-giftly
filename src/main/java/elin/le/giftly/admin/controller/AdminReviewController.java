@@ -2,7 +2,7 @@ package elin.le.giftly.admin.controller;
 
 import elin.le.giftly.admin.service.AdminReviewService;
 import elin.le.giftly.common.dto.ApiResponse;
-import elin.le.giftly.review.entity.Review;
+import elin.le.giftly.review.dto.ReviewResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,12 +22,12 @@ public class AdminReviewController {
     private final AdminReviewService adminReviewService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<Review>>> getAllReviews(
+    public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getAllReviews(
             @RequestParam(required = false) UUID productId,
             @RequestParam(required = false) UUID userId,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        Page<Review> reviews;
+        Page<ReviewResponse> reviews;
         if (productId != null) {
             reviews = adminReviewService.getReviewsByProduct(productId, pageable);
         } else if (userId != null) {
@@ -40,14 +40,8 @@ public class AdminReviewController {
     }
 
     @GetMapping("/{reviewId}")
-    public ResponseEntity<ApiResponse<Review>> getReviewById(@PathVariable UUID reviewId) {
-        Review review = adminReviewService.getReviewById(reviewId);
+    public ResponseEntity<ApiResponse<ReviewResponse>> getReviewById(@PathVariable UUID reviewId) {
+        ReviewResponse review = adminReviewService.getReviewById(reviewId);
         return ResponseEntity.ok(ApiResponse.success(review));
-    }
-
-    @DeleteMapping("/{reviewId}")
-    public ResponseEntity<ApiResponse<Void>> deleteReview(@PathVariable UUID reviewId) {
-        adminReviewService.deleteReview(reviewId);
-        return ResponseEntity.ok(ApiResponse.success("Review deleted successfully", null));
     }
 }

@@ -102,7 +102,7 @@ public class OrderService {
                 .subtotal(subtotal)
                 .shippingFee(SHIPPING_FEE)
                 .totalAmount(subtotal.add(SHIPPING_FEE))
-                .status(OrderStatus.PENDING)
+                .status(OrderStatus.PENDING_CONFIRMATION)
                 .orderedAt(LocalDateTime.now())
                 .items(orderItems)
                 .build();
@@ -173,6 +173,42 @@ public class OrderService {
         if (!order.getUserId().equals(userId)) {
             throw new BadRequestException("You do not have access to this order");
         }
+
+        return toOrderResponse(order);
+    }
+
+    @Transactional
+    public OrderResponse cancelOrder(UUID orderId) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        UUID userId = getCurrentUserId(email);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BadRequestException("You do not have access to this order");
+        }
+
+        // Only allow cancellation when order is in PENDING_CONFIRMATION status
+        if (order.getStatus() != OrderStatus.PENDING_CONFIRMATION) {
+            throw new BadRequestException(
+                    "Order can only be cancelled before admin confirmation. Current status: " + order.getStatus()
+            );
+        }
+
+        // Restore stock for all order items
+        List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+        for (OrderItem item : items) {
+            if (item.getProduct() != null) {
+                Product product = item.getProduct();
+                product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+                productRepository.save(product);
+            }
+        }
+
+        // Update order status to CANCELLED
+        order.setStatus(OrderStatus.CANCELLED);
+        order = orderRepository.save(order);
 
         return toOrderResponse(order);
     }

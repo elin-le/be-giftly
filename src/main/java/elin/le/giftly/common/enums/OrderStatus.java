@@ -1,11 +1,17 @@
 package elin.le.giftly.common.enums;
 
 public enum OrderStatus {
-    PENDING,
+    PENDING_CONFIRMATION,
     CONFIRMED,
     PROCESSING,
-    SHIPPED,
+    PACKAGING,
+    READY_TO_SHIP,
+    SHIPPING,
     DELIVERED,
+    COMPLETED,
+
     CANCELLED,
-    REFUNDED
+    RETURN_REQUESTED,
+    RETURNED,
+    FAILED
 }

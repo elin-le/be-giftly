@@ -5,6 +5,7 @@ import elin.le.giftly.product.dto.PaginatedProductsResponse;
 import elin.le.giftly.product.dto.ProductResponse;
 import elin.le.giftly.product.entity.Product;
 import elin.le.giftly.product.repository.ProductRepository;
+import elin.le.giftly.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -21,6 +22,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
+    private final ReviewRepository reviewRepository;
 
     private static final int DEFAULT_PAGE_SIZE = 20;
 
@@ -54,7 +56,19 @@ public class ProductService {
         boolean hasMore = products.size() > limit - 1;
         List<Product> pagedProducts = hasMore ? products.subList(0, limit - 1) : products;
 
-        List<ProductResponse> productResponses = productMapper.toResponseListWithDetails(pagedProducts);
+        List<ProductResponse> productResponses = pagedProducts.stream()
+                .map(product -> {
+                    ProductResponse base = productMapper.toResponseWithDetails(product);
+                    double avgRating = reviewRepository.findAverageRatingByProductId(product.getId());
+                    long reviewCount = reviewRepository.countByProductId(product.getId());
+                    return new ProductResponse(
+                            base.id(), base.name(), base.description(), base.price(),
+                            base.stockQuantity(), base.productType(), base.status(),
+                            base.category(), base.images(),
+                            Math.round(avgRating * 100.0) / 100.0, reviewCount
+                    );
+                })
+                .toList();
 
         String nextCursor = null;
         if (hasMore && !pagedProducts.isEmpty()) {

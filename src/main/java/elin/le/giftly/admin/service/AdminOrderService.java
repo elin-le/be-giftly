@@ -2,6 +2,7 @@ package elin.le.giftly.admin.service;
 
 import elin.le.giftly.admin.dto.AdminOrderResponse;
 import elin.le.giftly.common.enums.OrderStatus;
+import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.order.entity.Order;
 import elin.le.giftly.order.entity.OrderItem;
@@ -15,7 +16,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -60,10 +63,78 @@ public class AdminOrderService {
     public AdminOrderResponse updateOrderStatus(UUID orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        OrderStatus currentStatus = order.getStatus();
+        validateTransition(currentStatus, newStatus);
+
         order.setStatus(newStatus);
         order = orderRepository.save(order);
         return toAdminResponse(order);
     }
+
+    private void validateTransition(OrderStatus currentStatus, OrderStatus newStatus) {
+        if (currentStatus == newStatus) {
+            throw new BadRequestException("Order is already in status: " + currentStatus);
+        }
+
+        // Terminal states cannot transition to other states
+        if (isTerminalState(currentStatus)) {
+            throw new BadRequestException(
+                "Cannot change status from terminal state: " + currentStatus
+            );
+        }
+
+        // Validate against allowed transitions
+        List<OrderStatus> allowedTransitions = ALLOWED_TRANSITIONS.get(currentStatus);
+        if (allowedTransitions != null && !allowedTransitions.contains(newStatus)) {
+            throw new BadRequestException(
+                "Cannot transition from " + currentStatus + " to " + newStatus +
+                ". Allowed transitions: " + allowedTransitions
+            );
+        }
+    }
+
+    private boolean isTerminalState(OrderStatus status) {
+        return status == OrderStatus.COMPLETED ||
+               status == OrderStatus.CANCELLED ||
+               status == OrderStatus.RETURNED ||
+               status == OrderStatus.FAILED;
+    }
+
+    // Valid status transitions map
+    private static final Map<OrderStatus, List<OrderStatus>> ALLOWED_TRANSITIONS = Map.of(
+        OrderStatus.PENDING_CONFIRMATION, List.of(
+            OrderStatus.CONFIRMED,
+            OrderStatus.CANCELLED
+        ),
+        OrderStatus.CONFIRMED, List.of(
+            OrderStatus.PROCESSING,
+            OrderStatus.CANCELLED
+        ),
+        OrderStatus.PROCESSING, List.of(
+            OrderStatus.PACKAGING,
+            OrderStatus.CANCELLED
+        ),
+        OrderStatus.PACKAGING, List.of(
+            OrderStatus.READY_TO_SHIP,
+            OrderStatus.CANCELLED
+        ),
+        OrderStatus.READY_TO_SHIP, List.of(
+            OrderStatus.SHIPPING
+        ),
+        OrderStatus.SHIPPING, List.of(
+            OrderStatus.DELIVERED,
+            OrderStatus.FAILED
+        ),
+        OrderStatus.DELIVERED, List.of(
+            OrderStatus.COMPLETED,
+            OrderStatus.RETURN_REQUESTED
+        ),
+        OrderStatus.RETURN_REQUESTED, List.of(
+            OrderStatus.RETURNED,
+            OrderStatus.CONFIRMED
+        )
+    );
 
     private AdminOrderResponse toAdminResponse(Order order) {
         User user = userRepository.findById(order.getUserId()).orElse(null);

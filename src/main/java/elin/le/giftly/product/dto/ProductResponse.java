@@ -13,7 +13,9 @@ public record ProductResponse(
         String productType,
         String status,
         CategoryResponse category,
-        List<ImageResponse> images
+        List<ImageResponse> images,
+        Double averageRating,
+        Long reviewCount
 ) {
     public record CategoryResponse(
             UUID id,

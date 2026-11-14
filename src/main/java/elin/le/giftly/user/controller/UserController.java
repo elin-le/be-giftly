@@ -1,6 +1,7 @@
 package elin.le.giftly.user.controller;
 
 import elin.le.giftly.common.dto.ApiResponse;
+import elin.le.giftly.user.dto.UpdateAdminProfileRequest;
 import elin.le.giftly.user.dto.UpdateUserRequest;
 import elin.le.giftly.user.dto.UserResponse;
 import elin.le.giftly.user.service.UserService;
@@ -26,5 +27,12 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(@Valid @RequestBody UpdateUserRequest request) {
         UserResponse userResponse = userService.updateUser(request);
         return ResponseEntity.ok(ApiResponse.success("User profile updated successfully", userResponse));
+    }
+
+    @PatchMapping
+    public ResponseEntity<ApiResponse<UserResponse>> updateAdminProfile(
+            @Valid @RequestBody UpdateAdminProfileRequest request) {
+        UserResponse userResponse = userService.updateAdminProfile(request);
+        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully with secret code", userResponse));
     }
 }
