@@ -8,12 +8,12 @@ public record ProductResponse(
         UUID id,
         String name,
         String description,
-        BigDecimal price,
-        Integer stockQuantity,
         String productType,
         String status,
+        Boolean isCustomBoxEligible,
         CategoryResponse category,
         List<ImageResponse> images,
+        List<VariantResponse> variants,
         Double averageRating,
         Long reviewCount
 ) {
@@ -29,6 +29,15 @@ public record ProductResponse(
             String publicId,
             String secureUrl,
             Boolean isThumbnail
+    ) {
+    }
+
+    public record VariantResponse(
+            UUID id,
+            String sku,
+            BigDecimal price,
+            Integer stockQuantity,
+            String status
     ) {
     }
 }

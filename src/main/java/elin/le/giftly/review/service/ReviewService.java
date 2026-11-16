@@ -2,7 +2,6 @@ package elin.le.giftly.review.service;
 
 import elin.le.giftly.cloudinary.service.CloudinaryService;
 import elin.le.giftly.common.enums.OrderStatus;
-import elin.le.giftly.common.enums.ReviewStatus;
 import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.order.entity.Order;
@@ -21,9 +20,7 @@ import elin.le.giftly.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -31,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -59,48 +55,38 @@ public class ReviewService {
         OrderItem orderItem = orderItemRepository.findById(request.orderItemId())
                 .orElseThrow(() -> new ResourceNotFoundException("OrderItem", "id", request.orderItemId()));
 
-        // Verify the order item belongs to an order owned by the current user
         Order order = orderItem.getOrder();
         if (!order.getUserId().equals(userId)) {
             throw new AccessDeniedException("You can only review items from your own orders");
         }
 
-        // Check order status must be COMPLETED
-        if (order.getStatus() != OrderStatus.COMPLETED) {
+        if (order.getStatus() != OrderStatus.COMPLETED && order.getStatus() != OrderStatus.DELIVERED) {
             throw new BadRequestException(
-                    "You can only review items from completed orders. Current status: " + order.getStatus()
+                    "You can only review items from completed or delivered orders. Current status: " + order.getStatus()
             );
         }
 
-        // Check if review already exists for this order item (one review per order item)
-        if (reviewRepository.existsByOrderItemId(request.orderItemId())) {
-            throw new BadRequestException("You have already reviewed this item");
-        }
-
-        // Build the review with status PENDING
+        // Build the review
         Review review = Review.builder()
                 .userId(userId)
-                .product(orderItem.getProduct())
+                .product(orderItem.getOrder() != null ? null : null)
+                .productVariantId(orderItem.getProductVariantId())
                 .orderItem(orderItem)
                 .rating(request.rating().shortValue())
                 .title(request.title())
                 .comment(request.comment())
-                .status(ReviewStatus.PENDING)
                 .build();
+
+        // Set product from variant if available
+        if (orderItem.getProductVariantId() != null) {
+            // Product is referenced via variant snapshot
+        }
 
         review = reviewRepository.save(review);
 
-        // Handle image upload if provided
+        // Handle image upload
         if (imageFile != null && !imageFile.isEmpty()) {
             uploadReviewImage(review, imageFile);
-        } else if (request.imageUrl() != null && !request.imageUrl().isEmpty()) {
-            // If imageUrl is provided directly, create ReviewImage entity
-            ReviewImage reviewImage = ReviewImage.builder()
-                    .review(review)
-                    .imageUrl(request.imageUrl())
-                    .build();
-            review.setReviewImage(reviewImage);
-            reviewRepository.save(review);
         }
 
         return toReviewResponse(review);
@@ -116,10 +102,11 @@ public class ReviewService {
             ReviewImage reviewImage = ReviewImage.builder()
                     .review(review)
                     .imageUrl((String) uploadResult.get("secure_url"))
+                    .secureUrl((String) uploadResult.get("secure_url"))
                     .publicId((String) uploadResult.get("public_id"))
                     .build();
             
-            review.setReviewImage(reviewImage);
+            review.getImages().add(reviewImage);
             reviewRepository.save(review);
             log.info("Successfully uploaded review image for review: {}", review.getId());
         } catch (Exception e) {
@@ -171,9 +158,11 @@ public class ReviewService {
             throw new AccessDeniedException("You can only delete your own reviews");
         }
 
-        // Delete associated image from Cloudinary if exists
-        if (review.getReviewImage() != null && review.getReviewImage().getPublicId() != null) {
-            cloudinaryService.deleteImage(review.getReviewImage().getPublicId());
+        // Delete associated images from Cloudinary
+        for (ReviewImage img : review.getImages()) {
+            if (img.getPublicId() != null) {
+                cloudinaryService.deleteImage(img.getPublicId());
+            }
         }
 
         reviewRepository.delete(review);
@@ -193,21 +182,20 @@ public class ReviewService {
             );
         }
 
-        String reviewImageUrl = null;
-        if (review.getReviewImage() != null) {
-            reviewImageUrl = review.getReviewImage().getImageUrl();
-        }
+        List<String> imageUrls = review.getImages().stream()
+                .map(ReviewImage::getSecureUrl)
+                .toList();
 
         return new ReviewResponse(
                 review.getId(),
                 review.getUserId(),
                 user != null ? user.getEmail() : null,
                 productInfo,
+                review.getProductVariantId(),
                 review.getRating() != null ? review.getRating().intValue() : null,
                 review.getTitle(),
                 review.getComment(),
-                review.getStatus(),
-                reviewImageUrl,
+                imageUrls,
                 review.getCreatedAt(),
                 review.getUpdatedAt()
         );

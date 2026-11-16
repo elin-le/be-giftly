@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 @RestController
@@ -23,14 +22,10 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    @Operation(summary = "Get products", description = "Browse products with optional filtering by category, price range, and keyword search. Supports cursor-based pagination.")
+    @Operation(summary = "Get products", description = "Browse products with optional filtering by category and keyword search. Supports cursor-based pagination.")
     public ResponseEntity<ApiResponse<PaginatedProductsResponse>> getProducts(
             @Parameter(description = "Filter by category ID")
             @RequestParam(required = false) UUID categoryId,
-            @Parameter(description = "Minimum price filter")
-            @RequestParam(required = false) BigDecimal minPrice,
-            @Parameter(description = "Maximum price filter")
-            @RequestParam(required = false) BigDecimal maxPrice,
             @Parameter(description = "Search keyword for product name or description")
             @RequestParam(required = false) String keyword,
             @Parameter(description = "Cursor for pagination")
@@ -40,8 +35,6 @@ public class ProductController {
     ) {
         PaginatedProductsResponse response = productService.getProducts(
                 categoryId,
-                minPrice,
-                maxPrice,
                 keyword,
                 cursor,
                 pageSize

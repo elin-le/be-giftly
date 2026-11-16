@@ -1,45 +1,54 @@
-# Database Schema
+# Database Schema — Giftly
+
+> Generated from JPA entities — source of truth is the Java entity code under `src/main/java/elin/le/giftly/**/entity/`.
+
+---
 
 ## Entity-Relationship Diagram
 
 ```
-┌──────────────┐       ┌──────────────┐       ┌──────────────┐
-│    user      │──┐    │  user_role   │──┐    │     role     │
-└──────┬───────┘  │    └──────────────┘  │    └──────────────┘
-       │          │                       │
-       │ 1        │ 1                     │ 1
-       │   ┌──────┴───┐              ┌────┴───┐
-       │   │  address  │              │ product│
-       │   └──────┬───┘              └───┬────┘
-       │ 1        │ 1                    │ 1
-       │   ┌──────┴───┐              ┌───┴──────────┐
-       │   │   cart    │              │  category    │
-       │   └──────┬───┘              └──────────────┘
-       │ 1        │ 1
-       │   ┌──────┴───┐
-       │   │ cart_item │
-       │   └──────┬───┘
-       │ 1        │ *
-       │   ┌──────┴─────────────────────────────────┐
-       │   │                                         │
-       ▼   ▼                                         ▼
-┌──────────────┐  ┌──────────────┐       ┌──────────────────┐
-│    order     │  │gift_box_config│       │  product_image   │
-└──────┬───────┘  └───────┬──────┘       └──────────────────┘
-       │ 1                │ 1
-       │   ┌──────────────┴──┐
-       │   │  order_item     │
-       │   └────────┬────────┘
-       │ 1          │ 1
-       │   ┌────────┴────────┐       ┌──────────────────┐
-       │   │order_item_      │       │    payment       │
-       │   │  component      │       └──────────────────┘
-       │   └─────────────────┘
-       │ 1
-       │   ┌──────────────────┐
-       └──►│     review       │
-           └──────────────────┘
+┌──────────┐       ┌───────────┐       ┌──────────┐
+│   user   │──┐    │ user_role │──┐    │   role   │
+└────┬─────┘  │    └───────────┘  │    └──────────┘
+     │        │                    │
+     │ 1:N    │ 1:N                │ 1:N
+     │  ┌─────┴──┐          ┌──────┴───┐
+     │  │ address │          │ category │
+     │  └────────┘          └────┬─────┘
+     │ 1:N                       │ 1:N
+     │  ┌────────┐          ┌────┴──────────┐
+     │  │  cart   │          │   product     │
+     │  └────┬────┘          └──────┬────────┘
+     │ 1:N   │ 1:N                 │ 1:N
+     │  ┌────┴────┐          ┌─────┴──────────┐
+     │  │cart_item │          │ product_image  │
+     │  └────┬────┘          └────────────────┘
+     │       │
+     ▼       ▼
+┌──────────┐  ┌────────────────┐
+│  order   │  │ gift_box_config │
+└────┬─────┘  └────────┬───────┘
+     │ 1:N             │ 1:N
+     │  ┌──────────────┴──┐
+     │  │  order_item     │
+     │  └────────┬────────┘
+     │ 1:N       │ 1:N
+     │  ┌────────┴────────┐   ┌──────────────┐
+     │  │order_item_      │   │   payment    │
+     │  │  component      │   └──────────────┘
+     │  └─────────────────┘
+     │ 1:N
+     │  ┌──────────────┐
+     └─►│    review     │
+        └──────┬───────┘
+               │ 1:1
+               ▼
+        ┌──────────────┐
+        │ review_image  │
+        └──────────────┘
 ```
+
+---
 
 ## Tables
 
@@ -47,72 +56,63 @@
 
 #### `user`
 
-Stores user accounts.
+Tài khoản người dùng. Mỗi user có một UUID làm primary key, email là unique credential để đăng nhập.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique user identifier |
-| `email` | VARCHAR(255) | NOT NULL, UNIQUE | User email (login credential) |
-| `password` | VARCHAR(255) | NOT NULL | BCrypt-hashed password |
-| `full_name` | VARCHAR(255) | NOT NULL | User's full name |
-| `phone` | VARCHAR(50) | NULL | Phone number |
-| `status` | VARCHAR(20) | NOT NULL | User status (ACTIVE, SUSPENDED, BANNED) |
-| `created_at` | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Account creation time |
-| `updated_at` | TIMESTAMP | NULL | Last update time |
-
-**Indexes:**
-- `idx_user_email` on `email`
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique user identifier |
+| `email` | VARCHAR | **NOT NULL**, **UNIQUE** | Email đăng nhập |
+| `password` | VARCHAR | **NOT NULL** | BCrypt-hashed password |
+| `full_name` | VARCHAR | **NOT NULL** | Họ và tên |
+| `phone` | VARCHAR | NULL | Số điện thoại |
+| `status` | VARCHAR (enum) | **NOT NULL** | `ACTIVE`, `INACTIVE`, `SUSPENDED` |
+| `created_at` | TIMESTAMP | **NOT NULL**, auto-generated (`@CreationTimestamp`), updatable=false | Thời gian tạo tài khoản |
+| `updated_at` | TIMESTAMP | auto-updated (`@UpdateTimestamp`) | Thời gian cập nhật cuối |
 
 ---
 
 #### `role`
 
-Defines available roles.
+Các vai trò trong hệ thống (Spring Security roles).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique role identifier |
-| `name` | VARCHAR(50) | NOT NULL, UNIQUE | Role name (e.g., ROLE_USER, ROLE_ADMIN) |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique role identifier |
+| `name` | VARCHAR | **NOT NULL**, **UNIQUE** | Tên role (e.g. `ROLE_USER`, `ROLE_ADMIN`) |
 
-**Default Data:**
-- `ROLE_USER` — Standard customer
-- `ROLE_ADMIN` — Administrator
+**Default Data** (seeded by `AdminInitializer`):
+- `ROLE_USER` — Khách hàng thường
+- `ROLE_ADMIN` — Quản trị viên
 
 ---
 
 #### `user_role`
 
-Many-to-many relationship between users and roles.
+Bảng trung gian cho quan hệ N:N giữa user và role.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique identifier |
-| `user_id` | UUID | NOT NULL, FK → user(id) | User reference |
-| `role_id` | UUID | NOT NULL, FK → role(id) | Role reference |
-
-**Constraints:**
-- `uk_user_role` — UNIQUE (user_id, role_id) — prevents duplicate role assignments
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique identifier |
+| `user_id` | UUID | **NOT NULL**, FK → `user(id)` (`@ManyToOne`, LAZY) | Tham chiếu user |
+| `role_id` | UUID | **NOT NULL**, FK → `role(id)` (`@ManyToOne`, LAZY) | Tham chiếu role |
 
 ---
 
 #### `address`
 
-Stores user shipping addresses.
+Địa chỉ giao hàng của người dùng. Một user có thể có nhiều địa chỉ.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique address identifier |
-| `user_id` | UUID | NOT NULL, FK → user(id) | Owner user |
-| `recipient_name` | VARCHAR(255) | NOT NULL | Name of recipient |
-| `phone` | VARCHAR(50) | NOT NULL | Contact phone |
-| `address_line` | VARCHAR(500) | NOT NULL | Street address |
-| `ward` | VARCHAR(100) | NULL | Ward/sub-district |
-| `district` | VARCHAR(100) | NULL | District |
-| `city` | VARCHAR(100) | NULL | City/province |
-| `is_default` | BOOLEAN | DEFAULT FALSE | Default address flag |
-
-**Indexes:**
-- `idx_address_user` on `user_id`
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique address identifier |
+| `user_id` | UUID | **NOT NULL**, FK → `user(id)` | Chủ sở hữu |
+| `recipient_name` | VARCHAR | **NOT NULL** | Tên người nhận |
+| `phone` | VARCHAR | **NOT NULL** | Số điện thoại liên hệ |
+| `address_line` | VARCHAR | **NOT NULL** | Địa chỉ chi tiết (tên đường, số nhà) |
+| `ward` | VARCHAR | NULL | Phường/Xã |
+| `district` | VARCHAR | NULL | Quận/Huyện |
+| `city` | VARCHAR | NULL | Thành phố/Tỉnh |
+| `is_default` | BOOLEAN | NULL | Đánh dấu địa chỉ mặc định |
 
 ---
 
@@ -120,55 +120,48 @@ Stores user shipping addresses.
 
 #### `category`
 
-Product categories.
+Danh mục sản phẩm.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique category identifier |
-| `name` | VARCHAR(255) | NOT NULL | Category name |
-| `description` | TEXT | NULL | Category description |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique category identifier |
+| `name` | VARCHAR | **NOT NULL** | Tên danh mục |
+| `description` | VARCHAR | NULL | Mô tả danh mục |
 
 ---
 
 #### `product`
 
-Products in the catalog.
+Sản phẩm trong catalog. Có thể là sản phẩm thường, hộp quà, giấy gói, ruy băng, hoặc thiệp.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique product identifier |
-| `category_id` | UUID | NOT NULL, FK → category(id) | Product category |
-| `name` | VARCHAR(255) | NOT NULL | Product name |
-| `description` | TEXT | NULL | Product description |
-| `price` | NUMERIC(19,2) | NOT NULL | Product price |
-| `stock_quantity` | INTEGER | NOT NULL, DEFAULT 0 | Available stock |
-| `product_type` | VARCHAR(20) | NOT NULL | Type: COMPONENT or GIFT_BOX |
-| `status` | VARCHAR(20) | NOT NULL | Status: ACTIVE, INACTIVE, OUT_OF_STOCK |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique product identifier |
+| `category_id` | UUID | **NOT NULL**, FK → `category(id)` (`@ManyToOne`, LAZY) | Danh mục sản phẩm |
+| `name` | VARCHAR | **NOT NULL** | Tên sản phẩm |
+| `description` | VARCHAR | NULL | Mô tả sản phẩm |
+| `price` | NUMERIC(19,2) | **NOT NULL** | Giá sản phẩm |
+| `stock_quantity` | INTEGER | **NOT NULL** | Số lượng tồn kho |
+| `product_type` | VARCHAR (enum) | **NOT NULL** | `REGULAR`, `GIFT_BOX`, `WRAPPING`, `RIBBON`, `GREETING_CARD` |
+| `status` | VARCHAR (enum) | **NOT NULL** | `AVAILABLE`, `OUT_OF_STOCK`, `DISCONTINUED` |
 
-**Indexes:**
-- `idx_product_category` on `category_id`
-- `idx_product_status` on `status`
-- `idx_product_type` on `product_type`
-- `idx_product_name_trgm` — GIN trigram index on `name` (fuzzy search)
-- `idx_product_description_trgm` — GIN trigram index on `description` (fuzzy search)
+**Quan hệ:**
+- `product` (1) → (N) `product_image` — `CascadeType.ALL`, `orphanRemoval=true`
 
 ---
 
 #### `product_image`
 
-Product images stored on Cloudinary.
+Hình ảnh sản phẩm (lưu trên Cloudinary).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique image identifier |
-| `product_id` | UUID | NOT NULL, FK → product(id) | Parent product |
-| `image_url` | VARCHAR(500) | NOT NULL | Public image URL |
-| `secure_url` | VARCHAR(500) | NOT NULL | HTTPS image URL |
-| `public_id` | VARCHAR(255) | NOT NULL | Cloudinary public ID |
-| `is_thumbnail` | BOOLEAN | DEFAULT FALSE | Thumbnail flag |
-
-**Indexes:**
-- `idx_product_image_product` on `product_id`
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique image identifier |
+| `product_id` | UUID | **NOT NULL**, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm cha |
+| `image_url` | VARCHAR | **NOT NULL** | URL công khai của ảnh |
+| `secure_url` | VARCHAR | **NOT NULL** | URL HTTPS của ảnh |
+| `public_id` | VARCHAR | **NOT NULL** | Cloudinary public ID (dùng để xóa/cập nhật) |
+| `is_thumbnail` | BOOLEAN | NULL | Đánh dấu ảnh thumbnail |
 
 ---
 
@@ -176,37 +169,34 @@ Product images stored on Cloudinary.
 
 #### `gift_box_config`
 
-Custom gift box configurations created by users.
+Cấu hình hộp quà tùy chỉnh do người dùng tạo. Một config gồm hộp chính + các thành phần (giấy gói, ruy băng, thiệp) + danh sách sản phẩm bên trong.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique config identifier |
-| `user_id` | UUID | NOT NULL, FK → user(id) | Creating user |
-| `box_product_id` | UUID | NOT NULL, FK → product(id) | Box container product |
-| `wrapping_product_id` | UUID | NULL, FK → product(id) | Wrapping paper product |
-| `ribbon_product_id` | UUID | NULL, FK → product(id) | Ribbon product |
-| `card_product_id` | UUID | NULL, FK → product(id) | Greeting card product |
-| `greeting_message` | TEXT | NULL | Custom greeting text |
-| `created_at` | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Creation time |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique config identifier |
+| `user_id` | UUID | **NOT NULL**, FK → `user(id)` | Người tạo config |
+| `box_product_id` | UUID | **NOT NULL**, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm làm hộp chứa |
+| `wrapping_product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm giấy gói (optional) |
+| `ribbon_product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm ruy băng (optional) |
+| `card_product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm thiệp (optional) |
+| `greeting_message` | VARCHAR | NULL | Lời chúc tùy chỉnh |
+| `created_at` | TIMESTAMP | **NOT NULL**, auto-generated (`@CreationTimestamp`), updatable=false | Thời gian tạo |
 
-**Indexes:**
-- `idx_gift_box_config_user` on `user_id`
+**Quan hệ:**
+- `gift_box_config` (1) → (N) `gift_box_item` — `CascadeType.ALL`, `orphanRemoval=true`
 
 ---
 
 #### `gift_box_item`
 
-Items inside a gift box configuration.
+Các sản phẩm bên trong một gift box config.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique item identifier |
-| `config_id` | UUID | NOT NULL, FK → gift_box_config(id) | Parent config |
-| `product_id` | UUID | NOT NULL, FK → product(id) | Product in the box |
-| `quantity` | INTEGER | NOT NULL | Quantity of this product |
-
-**Indexes:**
-- `idx_gift_box_item_config` on `config_id`
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique item identifier |
+| `config_id` | UUID | **NOT NULL**, FK → `gift_box_config(id)` (`@ManyToOne`, LAZY) | Config cha |
+| `product_id` | UUID | **NOT NULL**, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm trong hộp |
+| `quantity` | INTEGER | **NOT NULL** | Số lượng sản phẩm này trong hộp |
 
 ---
 
@@ -214,36 +204,32 @@ Items inside a gift box configuration.
 
 #### `cart`
 
-User shopping carts (one per user).
+Giỏ hàng của người dùng.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique cart identifier |
-| `user_id` | UUID | NOT NULL, FK → user(id) | Owner user |
-| `updated_at` | TIMESTAMP | NULL | Last update time |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique cart identifier |
+| `user_id` | UUID | **NOT NULL**, FK → `user(id)` | Chủ sở hữu |
+| `updated_at` | TIMESTAMP | auto-updated (`@UpdateTimestamp`) | Thời gian cập nhật cuối |
 
-**Indexes:**
-- `idx_cart_user` on `user_id`
+**Quan hệ:**
+- `cart` (1) → (N) `cart_item` — `CascadeType.ALL`, `orphanRemoval=true`
 
 ---
 
 #### `cart_item`
 
-Items in a shopping cart.
+Mục trong giỏ hàng — có thể là sản phẩm thường HOẶC một gift box config.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique item identifier |
-| `cart_id` | UUID | NOT NULL, FK → cart(id) | Parent cart |
-| `product_id` | UUID | NULL, FK → product(id) | Regular product (mutually exclusive with gift_box_config_id) |
-| `gift_box_config_id` | UUID | NULL, FK → gift_box_config(id) | Gift box config (mutually exclusive with product_id) |
-| `quantity` | INTEGER | NOT NULL | Item quantity |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique item identifier |
+| `cart_id` | UUID | **NOT NULL**, FK → `cart(id)` (`@ManyToOne`, LAZY) | Giỏ hàng cha |
+| `product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm thường (mutually exclusive với gift_box_config_id) |
+| `gift_box_config_id` | UUID | NULL, FK → `gift_box_config(id)` (`@ManyToOne`, LAZY) | Gift box config (mutually exclusive với product_id) |
+| `quantity` | INTEGER | **NOT NULL** | Số lượng |
 
-**Constraints:**
-- `chk_cart_item_type` — CHECK: exactly one of `product_id` or `gift_box_config_id` must be set
-
-**Indexes:**
-- `idx_cart_item_cart` on `cart_id`
+**Business rule:** Một `cart_item` chỉ có thể có `product_id` **hoặc** `gift_box_config_id`, không được có cả hai.
 
 ---
 
@@ -251,65 +237,58 @@ Items in a shopping cart.
 
 #### `order`
 
-Customer orders.
+Đơn hàng của khách hàng.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique order identifier |
-| `user_id` | UUID | NOT NULL, FK → user(id) | Ordering user |
-| `address_id` | UUID | NOT NULL, FK → address(id) | Shipping address |
-| `order_number` | VARCHAR(50) | NOT NULL, UNIQUE | Human-readable order number |
-| `subtotal` | NUMERIC(19,2) | NOT NULL | Sum of item prices |
-| `shipping_fee` | NUMERIC(19,2) | NOT NULL | Shipping cost |
-| `total_amount` | NUMERIC(19,2) | NOT NULL | subtotal + shipping_fee |
-| `status` | VARCHAR(20) | NOT NULL | Order status (PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED) |
-| `ordered_at` | TIMESTAMP | NOT NULL | Order placement time |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique order identifier |
+| `user_id` | UUID | **NOT NULL**, FK → `user(id)` | Người đặt hàng |
+| `address_id` | UUID | **NOT NULL**, FK → `address(id)` (`@ManyToOne`, LAZY) | Địa chỉ giao hàng |
+| `order_number` | VARCHAR | **NOT NULL**, **UNIQUE** | Mã đơn hàng (human-readable) |
+| `subtotal` | NUMERIC(19,2) | **NOT NULL** | Tổng giá sản phẩm (chưa bao gồm phí ship) |
+| `shipping_fee` | NUMERIC(19,2) | **NOT NULL** | Phí vận chuyển |
+| `total_amount` | NUMERIC(19,2) | **NOT NULL** | Tổng thanh toán = subtotal + shipping_fee |
+| `status` | VARCHAR (enum) | **NOT NULL** | Xem phần [Order Status](#order-status-orderstatus) |
+| `ordered_at` | TIMESTAMP | **NOT NULL** | Thời gian đặt hàng |
 
-**Indexes:**
-- `idx_order_user` on `user_id`
-- `idx_order_number` on `order_number`
-- `idx_order_status` on `status`
+**Quan hệ:**
+- `order` (1) → (N) `order_item` — `CascadeType.ALL`, `orphanRemoval=true`
 
 ---
 
 #### `order_item`
 
-Line items in an order.
+Mục trong đơn hàng — snapshot tại thời điểm đặt hàng (tên, giá được lưu lại).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique item identifier |
-| `order_id` | UUID | NOT NULL, FK → order(id) | Parent order |
-| `product_id` | UUID | NULL, FK → product(id) | Regular product (mutually exclusive with gift_box_config_id) |
-| `gift_box_config_id` | UUID | NULL, FK → gift_box_config(id) | Gift box config (mutually exclusive with product_id) |
-| `item_name` | VARCHAR(255) | NOT NULL | Snapshot of item name |
-| `unit_price` | NUMERIC(19,2) | NOT NULL | Price at time of order |
-| `quantity` | INTEGER | NOT NULL | Quantity ordered |
-| `subtotal` | NUMERIC(19,2) | NOT NULL | unit_price × quantity |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique item identifier |
+| `order_id` | UUID | **NOT NULL**, FK → `order(id)` (`@ManyToOne`, LAZY) | Đơn hàng cha |
+| `product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm thường (mutually exclusive với gift_box_config_id) |
+| `gift_box_config_id` | UUID | NULL, FK → `gift_box_config(id)` (`@ManyToOne`, LAZY) | Gift box config (mutually exclusive với product_id) |
+| `item_name` | VARCHAR | **NOT NULL** | Tên mục (snapshot) |
+| `unit_price` | NUMERIC(19,2) | **NOT NULL** | Giá đơn vị tại thời điểm đặt |
+| `quantity` | INTEGER | **NOT NULL** | Số lượng |
+| `subtotal` | NUMERIC(19,2) | **NOT NULL** | Tổng = unit_price × quantity |
 
-**Constraints:**
-- `chk_order_item_type` — CHECK: exactly one of `product_id` or `gift_box_config_id` must be set
-
-**Indexes:**
-- `idx_order_item_order` on `order_id`
+**Quan hệ:**
+- `order_item` (1) → (N) `order_item_component` — `CascadeType.ALL`, `orphanRemoval=true`
 
 ---
 
 #### `order_item_component`
 
-Components of a gift box order item (box, wrapping, ribbon, card, contents).
+Các thành phần chi tiết của một gift box order item (hộp, giấy gói, ruy băng, thiệp, sản phẩm bên trong).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique component identifier |
-| `order_item_id` | UUID | NOT NULL, FK → order_item(id) | Parent order item |
-| `component_name` | VARCHAR(255) | NOT NULL | Component name |
-| `component_type` | VARCHAR(50) | NOT NULL | Type (BOX, WRAPPING, RIBBON, CARD, CONTENT) |
-| `unit_price` | NUMERIC(19,2) | NOT NULL | Component price |
-| `quantity` | INTEGER | NOT NULL | Component quantity |
-
-**Indexes:**
-- `idx_order_item_component_order_item` on `order_item_id`
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique component identifier |
+| `order_item_id` | UUID | NULL, FK → `order_item(id)` (`@ManyToOne`, LAZY) | Order item cha |
+| `product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm tương ứng (nếu có) |
+| `component_name` | VARCHAR | NULL | Tên thành phần |
+| `component_type` | VARCHAR | NULL | Loại thành phần (BOX, WRAPPING, RIBBON, CARD, CONTENT, v.v.) |
+| `unit_price` | NUMERIC(19,2) | NULL | Giá đơn vị thành phần |
+| `quantity` | INTEGER | NULL | Số lượng thành phần |
 
 ---
 
@@ -317,19 +296,16 @@ Components of a gift box order item (box, wrapping, ribbon, card, contents).
 
 #### `payment`
 
-Payment records for orders.
+Ghi nhận thanh toán cho đơn hàng.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique payment identifier |
-| `order_id` | UUID | NOT NULL, FK → order(id) | Related order |
-| `payment_method` | VARCHAR(20) | NOT NULL | Method (CASH_ON_DELIVERY, BANK_TRANSFER, etc.) |
-| `payment_status` | VARCHAR(20) | NOT NULL | Status (PENDING, COMPLETED, FAILED, REFUNDED) |
-| `amount` | NUMERIC(19,2) | NOT NULL | Payment amount |
-| `paid_at` | TIMESTAMP | NULL | Payment completion time |
-
-**Indexes:**
-- `idx_payment_order` on `order_id`
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique payment identifier |
+| `order_id` | UUID | **NOT NULL**, FK → `order(id)` (`@ManyToOne`, LAZY) | Đơn hàng liên quan |
+| `payment_method` | VARCHAR (enum) | **NOT NULL** | Xem phần [Payment Method](#payment-method-paymentmethod) |
+| `payment_status` | VARCHAR (enum) | **NOT NULL** | Xem phần [Payment Status](#payment-status-paymentstatus) |
+| `amount` | NUMERIC(19,2) | **NOT NULL** | Số tiền thanh toán |
+| `paid_at` | TIMESTAMP | NULL | Thời gian thanh toán thành công |
 
 ---
 
@@ -337,88 +313,114 @@ Payment records for orders.
 
 #### `review`
 
-Product reviews by users.
+Đánh giá sản phẩm của người dùng. Mỗi `order_item` chỉ được đánh giá **một lần** (unique constraint).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique review identifier |
-| `user_id` | UUID | NOT NULL, FK → user(id) | Reviewing user |
-| `product_id` | UUID | NOT NULL, FK → product(id) | Reviewed product |
-| `order_item_id` | UUID | NULL, FK → order_item(id) | Related order item (one review per item) |
-| `rating` | INTEGER | NOT NULL | Rating (1-5) |
-| `comment` | TEXT | NULL | Review text |
-| `created_at` | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Review creation time |
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique review identifier |
+| `user_id` | UUID | **NOT NULL**, FK → `user(id)` | Người đánh giá |
+| `product_id` | UUID | **NOT NULL**, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm được đánh giá |
+| `order_item_id` | UUID | **NOT NULL**, FK → `order_item(id)` (`@ManyToOne`, LAZY) | Order item liên quan |
+| `rating` | SMALLINT | **NOT NULL** | Điểm đánh giá (1–5) |
+| `title` | VARCHAR(255) | NULL | Tiêu đề đánh giá |
+| `comment` | VARCHAR | NULL | Nội dung bình luận |
+| `status` | VARCHAR (enum) | **NOT NULL** | `PENDING`, `APPROVED`, `REJECTED` |
+| `created_at` | TIMESTAMP | **NOT NULL**, auto-generated (`@CreationTimestamp`), updatable=false | Thời gian tạo |
+| `updated_at` | TIMESTAMP | auto-updated (`@UpdateTimestamp`) | Thời gian cập nhật cuối |
 
 **Constraints:**
-- `chk_review_rating` — CHECK: rating BETWEEN 1 AND 5
-- `uk_review_order_item` — UNIQUE (order_item_id) — one review per order item
+- **UNIQUE** (`order_item_id`) — mỗi order_item chỉ có một review
 
-**Indexes:**
-- `idx_review_product` on `product_id`
-- `idx_review_user` on `user_id`
+**Quan hệ:**
+- `review` (1) → (1) `review_image` — `CascadeType.ALL`, `orphanRemoval=true`
+
+---
+
+#### `review_image`
+
+Hình ảnh đính kèm review.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | **PK**, `GenerationType.UUID` | Unique image identifier |
+| `review_id` | UUID | **NOT NULL**, FK → `review(id)` (`@ManyToOne`, LAZY) | Review cha |
+| `image_url` | VARCHAR | **NOT NULL** | URL của ảnh |
+| `public_id` | VARCHAR | NULL | Cloudinary public ID |
+| `created_at` | TIMESTAMP | **NOT NULL**, auto-generated (`@CreationTimestamp`), updatable=false | Thời gian tạo |
 
 ---
 
 ## Enum Values
 
-### User Status (`user.status`)
+### User Status (`UserStatus`)
 
 | Value | Description |
 |-------|-------------|
-| `ACTIVE` | Normal active user |
-| `SUSPENDED` | Temporarily suspended |
-| `BANNED` | Permanently banned |
+| `ACTIVE` | Tài khoản hoạt động bình thường |
+| `INACTIVE` | Tài khoản không hoạt động |
+| `SUSPENDED` | Tài khoản bị tạm khóa |
 
-### Product Type (`product.product_type`)
-
-| Value | Description |
-|-------|-------------|
-| `COMPONENT` | Individual product (chocolate, wrapping, etc.) |
-| `GIFT_BOX` | Pre-made gift box product |
-
-### Product Status (`product.status`)
+### Product Type (`ProductType`)
 
 | Value | Description |
 |-------|-------------|
-| `AVAILABLE` | Available for purchase |
-| `OUT_OF_STOCK` | Temporarily unavailable |
-| `DISCONTINUED` | No longer sold |
+| `REGULAR` | Sản phẩm thông thường |
+| `GIFT_BOX` | Hộp quà (container) |
+| `WRAPPING` | Giấy gói quà |
+| `RIBBON` | Ruy băng |
+| `GREETING_CARD` | Thiệp chúc mừng |
 
-### Order Status (`order.status`)
-
-| Value | Description |
-|-------|-------------|
-| `PENDING` | Order placed, awaiting processing |
-| `PROCESSING` | Being prepared |
-| `SHIPPED` | Dispatched to customer |
-| `DELIVERED` | Received by customer |
-| `CANCELLED` | Order cancelled |
-
-### Payment Method (`payment.payment_method`)
+### Product Status (`ProductStatus`)
 
 | Value | Description |
 |-------|-------------|
-| `CASH_ON_DELIVERY` | Pay on delivery |
-| `BANK_TRANSFER` | Bank transfer |
+| `AVAILABLE` | Còn hàng, có thể mua |
+| `OUT_OF_STOCK` | Hết hàng tạm thời |
+| `DISCONTINUED` | Đã ngừng kinh doanh |
 
-### Payment Status (`payment.payment_status`)
+### Order Status (`OrderStatus`)
 
 | Value | Description |
 |-------|-------------|
-| `PENDING` | Awaiting payment |
-| `COMPLETED` | Payment received |
-| `FAILED` | Payment failed |
-| `REFUNDED` | Payment refunded |
+| `PENDING_CONFIRMATION` | Chờ xác nhận |
+| `CONFIRMED` | Đã xác nhận |
+| `PROCESSING` | Đang xử lý |
+| `PACKAGING` | Đang đóng gói |
+| `READY_TO_SHIP` | Sẵn sàng giao |
+| `SHIPPING` | Đang vận chuyển |
+| `DELIVERED` | Đã giao đến tay khách |
+| `COMPLETED` | Hoàn thành |
+| `CANCELLED` | Đã hủy |
+| `RETURN_REQUESTED` | Khách yêu cầu trả hàng |
+| `RETURNED` | Đã trả hàng |
+| `FAILED` | Thất bại |
 
----
+### Payment Method (`PaymentMethod`)
 
-## Database Migrations
+| Value | Description |
+|-------|-------------|
+| `CREDIT_CARD` | Thẻ tín dụng |
+| `DEBIT_CARD` | Thẻ ghi nợ |
+| `BANK_TRANSFER` | Chuyển khoản ngân hàng |
+| `E_WALLET` | Ví điện tử |
+| `COD` | Thanh toán khi nhận hàng |
 
-| Version | File | Description |
-|---------|------|-------------|
-| V1 | `V1__init_schema.sql` | Initial schema: all 14 tables, foreign keys, constraints, indexes, default roles |
-| V2 | `V2__enable_pg_trgm.sql` | Enable pg_trgm extension; create GIN trigram indexes on product name and description |
-| V3 | `V3__add_review_constraint.sql` | Add unique constraint on review.order_item_id (one review per order item) |
+### Payment Status (`PaymentStatus`)
+
+| Value | Description |
+|-------|-------------|
+| `PENDING` | Chờ thanh toán |
+| `PAID` | Đã thanh toán |
+| `FAILED` | Thanh toán thất bại |
+| `REFUNDED` | Đã hoàn tiền |
+
+### Review Status (`ReviewStatus`)
+
+| Value | Description |
+|-------|-------------|
+| `PENDING` | Chờ admin duyệt |
+| `APPROVED` | Admin đã duyệt |
+| `REJECTED` | Admin đã từ chối |
 
 ---
 
@@ -427,20 +429,59 @@ Product reviews by users.
 ```
 user (1) ──── (N) address
 user (1) ──── (N) cart
-user (1) ──── (1) cart ──── (N) cart_item
+cart (1) ──── (N) cart_item
 user (1) ──── (N) order
-user (1) ──── (N) review
-user (N) ──── (N) role  (via user_role)
-
 order (1) ──── (N) order_item
-order (1) ──── (1) payment
 order_item (1) ──── (N) order_item_component
+order (1) ──── (N) payment
+user (1) ──── (N) review
+review (1) ──── (1) review_image
+order_item (1) ──── (1) review  (unique constraint)
+user (N) ──── (N) role  (via user_role)
 
 category (1) ──── (N) product
 product (1) ──── (N) product_image
-product (1) ──── (N) review
 
 gift_box_config (1) ──── (N) gift_box_item
-gift_box_config (1) ──── (N) cart_item  (optional)
-gift_box_config (1) ──── (N) order_item (optional)
+gift_box_config (1) ──── (N) cart_item  (optional — product_id is null)
+gift_box_config (1) ──── (N) order_item (optional — product_id is null)
 ```
+
+---
+
+## Cascade & Orphan Removal
+
+| Parent | Child | Cascade | Orphan Removal |
+|--------|-------|---------|----------------|
+| `product` | `product_image` | `ALL` | ✓ |
+| `cart` | `cart_item` | `ALL` | ✓ |
+| `gift_box_config` | `gift_box_item` | `ALL` | ✓ |
+| `order` | `order_item` | `ALL` | ✓ |
+| `order_item` | `order_item_component` | `ALL` | ✓ |
+| `review` | `review_image` | `ALL` | ✓ |
+
+---
+
+## Summary
+
+| # | Table | Entity Class | Primary Key | FKs | Unique Constraints |
+|---|-------|-------------|-------------|-----|-------------------|
+| 1 | `user` | `User` | `id` (UUID) | — | `email` |
+| 2 | `role` | `Role` | `id` (UUID) | — | `name` |
+| 3 | `user_role` | `UserRole` | `id` (UUID) | `user_id`, `role_id` | — |
+| 4 | `address` | `Address` | `id` (UUID) | `user_id` | — |
+| 5 | `category` | `Category` | `id` (UUID) | — | — |
+| 6 | `product` | `Product` | `id` (UUID) | `category_id` | — |
+| 7 | `product_image` | `ProductImage` | `id` (UUID) | `product_id` | — |
+| 8 | `gift_box_config` | `GiftBoxConfig` | `id` (UUID) | `box_product_id`, `wrapping_product_id`, `ribbon_product_id`, `card_product_id` | — |
+| 9 | `gift_box_item` | `GiftBoxItem` | `id` (UUID) | `config_id`, `product_id` | — |
+| 10 | `cart` | `Cart` | `id` (UUID) | `user_id` | — |
+| 11 | `cart_item` | `CartItem` | `id` (UUID) | `cart_id`, `product_id`, `gift_box_config_id` | — |
+| 12 | `order` | `Order` | `id` (UUID) | `user_id`, `address_id` | `order_number` |
+| 13 | `order_item` | `OrderItem` | `id` (UUID) | `order_id`, `product_id`, `gift_box_config_id` | — |
+| 14 | `order_item_component` | `OrderItemComponent` | `id` (UUID) | `order_item_id`, `product_id` | — |
+| 15 | `payment` | `Payment` | `id` (UUID) | `order_id` | — |
+| 16 | `review` | `Review` | `id` (UUID) | `user_id`, `product_id`, `order_item_id` | `order_item_id` |
+| 17 | `review_image` | `ReviewImage` | `id` (UUID) | `review_id` | — |
+
+**Tổng cộng: 17 bảng, tất cả dùng UUID làm primary key.**

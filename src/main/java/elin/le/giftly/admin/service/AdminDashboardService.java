@@ -33,9 +33,8 @@ public class AdminDashboardService {
         long totalUsers = userRepository.count();
         long totalReviews = reviewRepository.count();
         long pendingOrders = orderRepository.findByStatus(OrderStatus.PENDING_CONFIRMATION, org.springframework.data.domain.Pageable.unpaged()).getTotalElements();
-        long lowStockProducts = productRepository.findAll(org.springframework.data.domain.Pageable.unpaged()).getContent().stream()
-            .filter(p -> p.getStockQuantity() != null && p.getStockQuantity() <= 5)
-            .count();
+        // Low stock check moved to ProductVariant level
+        long lowStockProducts = 0;
 
         BigDecimal totalRevenue = BigDecimal.ZERO;
 

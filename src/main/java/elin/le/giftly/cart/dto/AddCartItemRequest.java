@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record AddCartItemRequest(
-        @NotNull(message = "Product ID is required")
-        UUID productId,
+        @NotNull(message = "Product variant ID is required")
+        UUID productVariantId,
 
         @NotNull(message = "Quantity is required")
         @Min(value = 1, message = "Quantity must be at least 1")

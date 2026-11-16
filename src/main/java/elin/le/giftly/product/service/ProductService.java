@@ -4,7 +4,9 @@ import elin.le.giftly.common.mapper.ProductMapper;
 import elin.le.giftly.product.dto.PaginatedProductsResponse;
 import elin.le.giftly.product.dto.ProductResponse;
 import elin.le.giftly.product.entity.Product;
+import elin.le.giftly.product.entity.ProductVariant;
 import elin.le.giftly.product.repository.ProductRepository;
+import elin.le.giftly.product.repository.ProductVariantRepository;
 import elin.le.giftly.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -12,7 +14,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final ProductMapper productMapper;
     private final ReviewRepository reviewRepository;
 
@@ -29,8 +31,6 @@ public class ProductService {
     @Transactional(readOnly = true)
     public PaginatedProductsResponse getProducts(
             UUID categoryId,
-            BigDecimal minPrice,
-            BigDecimal maxPrice,
             String keyword,
             String cursor,
             int pageSize
@@ -45,11 +45,11 @@ public class ProductService {
         if (keyword != null && !keyword.trim().isEmpty()) {
             String trimmedKeyword = keyword.trim();
             products = productRepository.fuzzySearchProductsNative(
-                    trimmedKeyword, categoryId, minPrice, maxPrice, cursorUuid, limit
+                    trimmedKeyword, categoryId, cursorUuid, limit
             );
         } else {
             products = productRepository.findProductsCursor(
-                    categoryId, minPrice, maxPrice, null, cursorUuid, pageRequest
+                    categoryId, null, cursorUuid, pageRequest
             );
         }
 
@@ -58,13 +58,14 @@ public class ProductService {
 
         List<ProductResponse> productResponses = pagedProducts.stream()
                 .map(product -> {
-                    ProductResponse base = productMapper.toResponseWithDetails(product);
+                    List<ProductVariant> variants = productVariantRepository.findByProductId(product.getId());
+                    ProductResponse base = productMapper.toResponseWithDetails(product, variants);
                     double avgRating = reviewRepository.findAverageRatingByProductId(product.getId());
                     long reviewCount = reviewRepository.countByProductId(product.getId());
                     return new ProductResponse(
-                            base.id(), base.name(), base.description(), base.price(),
-                            base.stockQuantity(), base.productType(), base.status(),
-                            base.category(), base.images(),
+                            base.id(), base.name(), base.description(),
+                            base.productType(), base.status(), base.isCustomBoxEligible(),
+                            base.category(), base.images(), base.variants(),
                             Math.round(avgRating * 100.0) / 100.0, reviewCount
                     );
                 })

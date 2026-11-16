@@ -28,6 +28,9 @@ public class ReviewImage {
     @Column(name = "image_url", nullable = false)
     private String imageUrl;
 
+    @Column(name = "secure_url", nullable = false)
+    private String secureUrl;
+
     @Column(name = "public_id")
     private String publicId;
 

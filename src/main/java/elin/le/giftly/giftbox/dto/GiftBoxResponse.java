@@ -7,31 +7,20 @@ import java.util.UUID;
 public record GiftBoxResponse(
         UUID id,
         BoxProductResponse boxProduct,
-        ProductResponse wrappingProduct,
-        ProductResponse ribbonProduct,
-        ProductResponse cardProduct,
-        String greetingMessage,
         List<GiftBoxItemResponse> items,
         BigDecimal totalPrice
 ) {
-    public record ProductResponse(
-            UUID id,
-            String name,
-            BigDecimal price,
-            String thumbnailUrl
-    ) {}
-
     public record BoxProductResponse(
-            UUID id,
+            UUID variantId,
             String name,
-            BigDecimal price,
-            String thumbnailUrl
+            BigDecimal price
     ) {}
 
     public record GiftBoxItemResponse(
             UUID id,
-            UUID productId,
+            UUID variantId,
             String productName,
+            String sku,
             BigDecimal price,
             Integer quantity,
             BigDecimal subtotal

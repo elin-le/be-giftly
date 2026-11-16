@@ -9,7 +9,6 @@ import elin.le.giftly.cart.dto.AddCartItemRequest;
 import elin.le.giftly.common.enums.OrderStatus;
 import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.common.enums.ProductType;
-import elin.le.giftly.common.enums.ReviewStatus;
 import elin.le.giftly.common.enums.UserStatus;
 import elin.le.giftly.giftbox.dto.CreateGiftBoxRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxItemRequest;
@@ -104,10 +103,9 @@ public class TestDataFactory {
                 .category(category)
                 .name("Test Product " + productCounter++)
                 .description("Test product description")
-                .price(new BigDecimal("100000"))
-                .stockQuantity(100)
                 .productType(ProductType.REGULAR)
                 .status(ProductStatus.AVAILABLE)
+                .isCustomBoxEligible(true)
                 .build();
         product.setId(UUID.randomUUID());
         return product;
@@ -138,9 +136,7 @@ public class TestDataFactory {
                 .category(category)
                 .name("Test Gift Box")
                 .description("Test gift box")
-                .price(new BigDecimal("50000"))
-                .stockQuantity(50)
-                .productType(ProductType.GIFT_BOX)
+                .productType(ProductType.READY_MADE_GIFT_BOX)
                 .status(ProductStatus.AVAILABLE)
                 .build();
         product.setId(UUID.randomUUID());
@@ -148,33 +144,14 @@ public class TestDataFactory {
     }
 
     /**
-     * Create a wrapping product.
+     * Create a packaging accessory product.
      */
-    public static Product createWrappingProduct(Category category) {
+    public static Product createPackagingAccessoryProduct(Category category) {
         Product product = Product.builder()
                 .category(category)
-                .name("Test Wrapping")
-                .description("Test wrapping")
-                .price(new BigDecimal("20000"))
-                .stockQuantity(50)
-                .productType(ProductType.WRAPPING)
-                .status(ProductStatus.AVAILABLE)
-                .build();
-        product.setId(UUID.randomUUID());
-        return product;
-    }
-
-    /**
-     * Create a ribbon product.
-     */
-    public static Product createRibbonProduct(Category category) {
-        Product product = Product.builder()
-                .category(category)
-                .name("Test Ribbon")
-                .description("Test ribbon")
-                .price(new BigDecimal("10000"))
-                .stockQuantity(50)
-                .productType(ProductType.RIBBON)
+                .name("Test Packaging Accessory")
+                .description("Test packaging accessory")
+                .productType(ProductType.PACKAGING_ACCESSORY)
                 .status(ProductStatus.AVAILABLE)
                 .build();
         product.setId(UUID.randomUUID());
@@ -189,8 +166,6 @@ public class TestDataFactory {
                 .category(category)
                 .name("Test Card")
                 .description("Test card")
-                .price(new BigDecimal("15000"))
-                .stockQuantity(50)
                 .productType(ProductType.GREETING_CARD)
                 .status(ProductStatus.AVAILABLE)
                 .build();
@@ -225,8 +200,8 @@ public class TestDataFactory {
     /**
      * Create a test add cart item request.
      */
-    public static AddCartItemRequest createAddCartItemRequest(UUID productId) {
-        return new AddCartItemRequest(productId, 1);
+    public static AddCartItemRequest createAddCartItemRequest(UUID productVariantId) {
+        return new AddCartItemRequest(productVariantId, 1);
     }
 
     /**
@@ -240,8 +215,8 @@ public class TestDataFactory {
      * Create a test create gift box request.
      */
     public static CreateGiftBoxRequest createGiftBoxRequest(
-            UUID boxProductId, List<GiftBoxItemRequest> items) {
-        return new CreateGiftBoxRequest(boxProductId, null, null, null, "Happy Birthday!", items);
+            UUID boxVariantId, List<GiftBoxItemRequest> items) {
+        return new CreateGiftBoxRequest(boxVariantId, items);
     }
 
     /**
@@ -266,10 +241,9 @@ public class TestDataFactory {
                 categoryId,
                 "New Product",
                 "New product description",
-                new BigDecimal("150000"),
-                50,
                 ProductType.REGULAR,
                 ProductStatus.AVAILABLE,
+                true,
                 null
         );
     }

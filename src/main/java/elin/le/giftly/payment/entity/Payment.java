@@ -1,6 +1,7 @@
 package elin.le.giftly.payment.entity;
 
 import elin.le.giftly.common.enums.PaymentMethod;
+import elin.le.giftly.common.enums.PaymentStage;
 import elin.le.giftly.common.enums.PaymentStatus;
 import elin.le.giftly.order.entity.Order;
 import jakarta.persistence.*;
@@ -34,6 +35,10 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false)
     private PaymentStatus paymentStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_stage", nullable = false)
+    private PaymentStage paymentStage;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;

@@ -5,6 +5,8 @@ import elin.le.giftly.cart.entity.CartItem;
 import elin.le.giftly.cart.repository.CartItemRepository;
 import elin.le.giftly.cart.repository.CartRepository;
 import elin.le.giftly.common.enums.OrderStatus;
+import elin.le.giftly.common.enums.ProductType;
+import elin.le.giftly.common.enums.ReturnPolicy;
 import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.order.dto.*;
@@ -13,7 +15,10 @@ import elin.le.giftly.order.entity.OrderItem;
 import elin.le.giftly.order.repository.OrderItemRepository;
 import elin.le.giftly.order.repository.OrderRepository;
 import elin.le.giftly.product.entity.Product;
-import elin.le.giftly.product.repository.ProductRepository;
+import elin.le.giftly.product.entity.ProductVariant;
+import elin.le.giftly.product.entity.ProductVariantPolicy;
+import elin.le.giftly.product.repository.ProductVariantPolicyRepository;
+import elin.le.giftly.product.repository.ProductVariantRepository;
 import elin.le.giftly.user.entity.Address;
 import elin.le.giftly.user.entity.User;
 import elin.le.giftly.user.repository.AddressRepository;
@@ -40,7 +45,8 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
-    private final ProductRepository productRepository;
+    private final ProductVariantRepository productVariantRepository;
+    private final ProductVariantPolicyRepository productVariantPolicyRepository;
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
 
@@ -71,23 +77,42 @@ public class OrderService {
         // Validate stock and build order items
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal maxAdvancePercent = BigDecimal.ZERO;
+        boolean hasNoReturn = false;
 
         for (CartItem cartItem : cartItems) {
-            if (cartItem.getProduct() != null) {
-                Product product = cartItem.getProduct();
-                if (product.getStockQuantity() < cartItem.getQuantity()) {
-                    throw new BadRequestException("Insufficient stock for: " + product.getName());
+            if (cartItem.getProductVariantId() != null) {
+                ProductVariant variant = productVariantRepository.findById(cartItem.getProductVariantId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", cartItem.getProductVariantId()));
+
+                if (variant.getStockQuantity() < cartItem.getQuantity()) {
+                    throw new BadRequestException("Insufficient stock for: " + variant.getProduct().getName());
                 }
 
-                BigDecimal itemSubtotal = product.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+                BigDecimal itemSubtotal = variant.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
                 subtotal = subtotal.add(itemSubtotal);
 
+                // Check policy for advance payment
+                ProductVariantPolicy policy = productVariantPolicyRepository.findByVariantId(variant.getId());
+                if (policy != null && policy.getAdvancePaymentPercent() != null) {
+                    if (policy.getAdvancePaymentPercent().compareTo(maxAdvancePercent) > 0) {
+                        maxAdvancePercent = policy.getAdvancePaymentPercent();
+                    }
+                    if (policy.getReturnPolicy() == ReturnPolicy.NO_RETURN) {
+                        hasNoReturn = true;
+                    }
+                }
+
                 OrderItem orderItem = OrderItem.builder()
-                        .product(product)
-                        .itemName(product.getName())
-                        .unitPrice(product.getPrice())
+                        .productVariantId(variant.getId())
+                        .itemNameSnapshot(variant.getProduct().getName())
+                        .skuSnapshot(variant.getSku())
+                        .unitPrice(variant.getPrice())
                         .quantity(cartItem.getQuantity())
                         .subtotal(itemSubtotal)
+                        .returnPolicySnapshot(hasNoReturn ? ReturnPolicy.NO_RETURN : ReturnPolicy.RETURNABLE)
+                        .advancePaymentPercentSnapshot(maxAdvancePercent)
+                        .requiredAdvanceAmount(itemSubtotal.multiply(maxAdvancePercent).divide(BigDecimal.valueOf(100)))
                         .build();
                 orderItems.add(orderItem);
             }
@@ -95,6 +120,7 @@ public class OrderService {
 
         // Create order
         String orderNumber = generateOrderNumber();
+        BigDecimal requiredAdvance = subtotal.multiply(maxAdvancePercent).divide(BigDecimal.valueOf(100));
         Order order = Order.builder()
                 .userId(userId)
                 .address(address)
@@ -102,6 +128,7 @@ public class OrderService {
                 .subtotal(subtotal)
                 .shippingFee(SHIPPING_FEE)
                 .totalAmount(subtotal.add(SHIPPING_FEE))
+                .requiredAdvanceAmount(requiredAdvance)
                 .status(OrderStatus.PENDING_CONFIRMATION)
                 .orderedAt(LocalDateTime.now())
                 .items(orderItems)
@@ -116,10 +143,11 @@ public class OrderService {
 
         // Reduce stock
         for (OrderItem item : orderItems) {
-            if (item.getProduct() != null) {
-                Product product = item.getProduct();
-                product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
-                productRepository.save(product);
+            if (item.getProductVariantId() != null) {
+                ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
+                variant.setStockQuantity(variant.getStockQuantity() - item.getQuantity());
+                productVariantRepository.save(variant);
             }
         }
 
@@ -137,7 +165,6 @@ public class OrderService {
         int limit = (pageSize > 0 ? pageSize : DEFAULT_PAGE_SIZE) + 1;
         PageRequest pageRequest = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "orderedAt"));
 
-        UUID cursorDate = null; // Using orderedAt for cursor
         List<Order> orders;
 
         if (cursor != null && !cursor.isEmpty()) {
@@ -189,24 +216,23 @@ public class OrderService {
             throw new BadRequestException("You do not have access to this order");
         }
 
-        // Only allow cancellation when order is in PENDING_CONFIRMATION status
         if (order.getStatus() != OrderStatus.PENDING_CONFIRMATION) {
             throw new BadRequestException(
                     "Order can only be cancelled before admin confirmation. Current status: " + order.getStatus()
             );
         }
 
-        // Restore stock for all order items
+        // Restore stock
         List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
         for (OrderItem item : items) {
-            if (item.getProduct() != null) {
-                Product product = item.getProduct();
-                product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
-                productRepository.save(product);
+            if (item.getProductVariantId() != null) {
+                ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
+                variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
+                productVariantRepository.save(variant);
             }
         }
 
-        // Update order status to CANCELLED
         order.setStatus(OrderStatus.CANCELLED);
         order = orderRepository.save(order);
 
@@ -219,8 +245,8 @@ public class OrderService {
         List<OrderItemResponse> itemResponses = items.stream()
                 .map(item -> new OrderItemResponse(
                         item.getId(),
-                        item.getProduct() != null ? item.getProduct().getId() : null,
-                        item.getItemName(),
+                        item.getProductVariantId(),
+                        item.getItemNameSnapshot(),
                         item.getUnitPrice(),
                         item.getQuantity(),
                         item.getSubtotal()

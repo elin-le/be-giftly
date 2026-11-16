@@ -68,10 +68,9 @@ public class AdminProductService {
             .category(category)
             .name(request.name())
             .description(request.description())
-            .price(request.price())
-            .stockQuantity(request.stockQuantity())
             .productType(request.productType())
             .status(request.status())
+            .isCustomBoxEligible(request.isCustomBoxEligible())
             .build();
 
         product = productRepository.save(product);
@@ -110,28 +109,23 @@ public class AdminProductService {
         if (request.description() != null) {
             product.setDescription(request.description());
         }
-        if (request.price() != null) {
-            product.setPrice(request.price());
-        }
-        if (request.stockQuantity() != null) {
-            product.setStockQuantity(request.stockQuantity());
-        }
         if (request.productType() != null) {
             product.setProductType(request.productType());
         }
         if (request.status() != null) {
             product.setStatus(request.status());
         }
+        if (request.isCustomBoxEligible() != null) {
+            product.setIsCustomBoxEligible(request.isCustomBoxEligible());
+        }
 
         if (request.images() != null) {
-            // Get current images
             List<ProductImage> oldImages = productImageRepository.findByProductId(productId);
             Set<String> oldPublicIds = new HashSet<>();
             for (ProductImage img : oldImages) {
                 oldPublicIds.add(img.getPublicId());
             }
 
-            // Build set of new public IDs
             Set<String> newPublicIds = new HashSet<>();
             if (request.images() != null) {
                 for (ImageInfo info : request.images()) {
@@ -139,18 +133,12 @@ public class AdminProductService {
                 }
             }
 
-            // Find images that were removed (in old but not in new) and delete from Cloudinary
             Set<String> removedPublicIds = new HashSet<>(oldPublicIds);
             removedPublicIds.removeAll(newPublicIds);
             if (!removedPublicIds.isEmpty()) {
                 cloudinaryService.deleteImages(removedPublicIds.stream().toList());
             }
 
-            // Find images that are new (in new but not in old)
-            Set<String> addedPublicIds = new HashSet<>(newPublicIds);
-            addedPublicIds.removeAll(oldPublicIds);
-
-            // Delete all old DB images and recreate from the new list
             productImageRepository.deleteByProductId(productId);
 
             Product savedProduct = product;

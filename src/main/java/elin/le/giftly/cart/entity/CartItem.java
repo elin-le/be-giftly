@@ -1,10 +1,11 @@
 package elin.le.giftly.cart.entity;
 
 import elin.le.giftly.giftbox.entity.GiftBoxConfig;
-import elin.le.giftly.product.entity.Product;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -24,9 +25,8 @@ public class CartItem {
     @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id")
-    private Product product;
+    @Column(name = "product_variant_id")
+    private UUID productVariantId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gift_box_config_id")
@@ -34,4 +34,8 @@ public class CartItem {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    @OneToMany(mappedBy = "cartItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<CartItemOptionSelection> optionSelections = new ArrayList<>();
 }

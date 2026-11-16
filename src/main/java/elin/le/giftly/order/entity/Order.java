@@ -1,6 +1,7 @@
 package elin.le.giftly.order.entity;
 
 import elin.le.giftly.common.enums.OrderStatus;
+import elin.le.giftly.payment.entity.Payment;
 import elin.le.giftly.user.entity.Address;
 import jakarta.persistence.*;
 import lombok.*;
@@ -43,6 +44,9 @@ public class Order {
     @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "required_advance_amount", precision = 19, scale = 2)
+    private BigDecimal requiredAdvanceAmount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status;
@@ -53,4 +57,8 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Payment> payments = new ArrayList<>();
 }

@@ -13,7 +13,9 @@ import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.product.entity.Product;
 import elin.le.giftly.product.entity.ProductImage;
+import elin.le.giftly.product.entity.ProductVariant;
 import elin.le.giftly.product.repository.ProductRepository;
+import elin.le.giftly.product.repository.ProductVariantRepository;
 import elin.le.giftly.user.entity.User;
 import elin.le.giftly.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
@@ -61,24 +64,24 @@ public class CartService {
                     return cartRepository.save(newCart);
                 });
 
-        Product product = productRepository.findById(request.productId())
-                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.productId()));
+        ProductVariant variant = productVariantRepository.findById(request.productVariantId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", request.productVariantId()));
 
-        if (product.getStatus() != ProductStatus.AVAILABLE) {
-            throw new BadRequestException("Product is not available");
+        if (variant.getStatus() != ProductStatus.AVAILABLE) {
+            throw new BadRequestException("Product variant is not available");
         }
 
-        if (product.getStockQuantity() < request.quantity()) {
-            throw new BadRequestException("Insufficient stock. Available: " + product.getStockQuantity());
+        if (variant.getStockQuantity() < request.quantity()) {
+            throw new BadRequestException("Insufficient stock. Available: " + variant.getStockQuantity());
         }
 
         // Check if item already exists in cart
-        Optional<CartItem> existingItem = cartItemRepository.findByCartIdAndProductId(cart.getId(), request.productId());
+        Optional<CartItem> existingItem = cartItemRepository.findByCartIdAndProductVariantId(cart.getId(), request.productVariantId());
         if (existingItem.isPresent()) {
             CartItem item = existingItem.get();
             int newQuantity = item.getQuantity() + request.quantity();
-            if (product.getStockQuantity() < newQuantity) {
-                throw new BadRequestException("Insufficient stock. Available: " + product.getStockQuantity());
+            if (variant.getStockQuantity() < newQuantity) {
+                throw new BadRequestException("Insufficient stock. Available: " + variant.getStockQuantity());
             }
             item.setQuantity(newQuantity);
             cartItemRepository.save(item);
@@ -88,7 +91,7 @@ public class CartService {
         // Add new item
         CartItem newItem = CartItem.builder()
                 .cart(cart)
-                .product(product)
+                .productVariantId(variant.getId())
                 .quantity(request.quantity())
                 .build();
         cartItemRepository.save(newItem);
@@ -102,10 +105,11 @@ public class CartService {
         CartItem item = cartItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart Item", "id", itemId));
 
-        if (item.getProduct() != null) {
-            Product product = item.getProduct();
-            if (product.getStockQuantity() < request.quantity()) {
-                throw new BadRequestException("Insufficient stock. Available: " + product.getStockQuantity());
+        if (item.getProductVariantId() != null) {
+            ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
+            if (variant.getStockQuantity() < request.quantity()) {
+                throw new BadRequestException("Insufficient stock. Available: " + variant.getStockQuantity());
             }
         }
 
@@ -146,22 +150,26 @@ public class CartService {
         int totalItems = 0;
 
         for (CartItem item : items) {
-            if (item.getProduct() != null) {
-                Product product = item.getProduct();
+            if (item.getProductVariantId() != null) {
+                ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
+                Product product = variant.getProduct();
                 String thumbnailUrl = getThumbnailUrl(product);
-                BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                BigDecimal itemTotal = variant.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
 
                 itemResponses.add(new CartItemResponse(
                         item.getId(),
-                        product.getId(),
+                        variant.getId(),
                         product.getName(),
-                        product.getPrice(),
+                        variant.getPrice(),
                         thumbnailUrl,
                         item.getQuantity()
                 ));
 
                 subtotal = subtotal.add(itemTotal);
                 totalItems += item.getQuantity();
+            } else if (item.getGiftBoxConfig() != null) {
+                // Custom gift box item - handled separately
             }
         }
 
@@ -169,6 +177,7 @@ public class CartService {
     }
 
     private String getThumbnailUrl(Product product) {
+        if (product == null || product.getImages() == null) return null;
         return product.getImages().stream()
                 .filter(ProductImage::getIsThumbnail)
                 .map(ProductImage::getSecureUrl)

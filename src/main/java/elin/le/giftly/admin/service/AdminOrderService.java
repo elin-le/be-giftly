@@ -143,8 +143,8 @@ public class AdminOrderService {
         List<AdminOrderResponse.AdminOrderItemResponse> itemResponses = items.stream()
             .map(item -> new AdminOrderResponse.AdminOrderItemResponse(
                 item.getId(),
-                item.getProduct() != null ? item.getProduct().getId() : null,
-                item.getItemName(),
+                item.getProductVariantId(),
+                item.getItemNameSnapshot(),
                 item.getUnitPrice(),
                 item.getQuantity(),
                 item.getSubtotal()

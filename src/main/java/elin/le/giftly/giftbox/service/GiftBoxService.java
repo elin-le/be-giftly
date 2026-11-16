@@ -7,12 +7,13 @@ import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.giftbox.dto.CreateGiftBoxRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxResponse;
 import elin.le.giftly.giftbox.entity.GiftBoxConfig;
-import elin.le.giftly.giftbox.entity.GiftBoxItem;
+import elin.le.giftly.giftbox.entity.GiftBoxConfigItem;
 import elin.le.giftly.giftbox.repository.GiftBoxConfigRepository;
-import elin.le.giftly.giftbox.repository.GiftBoxItemRepository;
+import elin.le.giftly.giftbox.repository.GiftBoxConfigItemRepository;
 import elin.le.giftly.product.entity.Product;
-import elin.le.giftly.product.entity.ProductImage;
+import elin.le.giftly.product.entity.ProductVariant;
 import elin.le.giftly.product.repository.ProductRepository;
+import elin.le.giftly.product.repository.ProductVariantRepository;
 import elin.le.giftly.user.entity.User;
 import elin.le.giftly.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,8 +31,9 @@ import java.util.UUID;
 public class GiftBoxService {
 
     private final GiftBoxConfigRepository giftBoxConfigRepository;
-    private final GiftBoxItemRepository giftBoxItemRepository;
+    private final GiftBoxConfigItemRepository giftBoxConfigItemRepository;
     private final ProductRepository productRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
 
     @Transactional
@@ -39,55 +41,46 @@ public class GiftBoxService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         UUID userId = getCurrentUserId(email);
 
-        // Validate box product
-        Product boxProduct = getProductAndValidateType(request.boxProductId(), ProductType.GIFT_BOX);
-
-        // Validate optional products
-        Product wrappingProduct = null;
-        if (request.wrappingProductId() != null) {
-            wrappingProduct = getProductAndValidateType(request.wrappingProductId(), ProductType.WRAPPING);
-        }
-
-        Product ribbonProduct = null;
-        if (request.ribbonProductId() != null) {
-            ribbonProduct = getProductAndValidateType(request.ribbonProductId(), ProductType.RIBBON);
-        }
-
-        Product cardProduct = null;
-        if (request.cardProductId() != null) {
-            cardProduct = getProductAndValidateType(request.cardProductId(), ProductType.GREETING_CARD);
-        }
+        // Validate box variant (must be READY_MADE_GIFT_BOX)
+        ProductVariant boxVariant = getVariantAndValidateType(request.boxVariantId(), ProductType.READY_MADE_GIFT_BOX);
 
         // Create gift box config
         GiftBoxConfig config = GiftBoxConfig.builder()
                 .userId(userId)
-                .boxProduct(boxProduct)
-                .wrappingProduct(wrappingProduct)
-                .ribbonProduct(ribbonProduct)
-                .cardProduct(cardProduct)
-                .greetingMessage(request.greetingMessage())
+                .boxVariantId(boxVariant.getId())
                 .build();
 
         config = giftBoxConfigRepository.save(config);
 
         // Create gift box items
-        List<GiftBoxItem> items = new ArrayList<>();
+        List<GiftBoxConfigItem> items = new ArrayList<>();
         for (var itemRequest : request.items()) {
-            Product product = productRepository.findById(itemRequest.productId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemRequest.productId()));
+            ProductVariant variant = productVariantRepository.findById(itemRequest.productVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", itemRequest.productVariantId()));
 
-            if (product.getStatus() != ProductStatus.AVAILABLE) {
-                throw new BadRequestException("Product is not available: " + product.getName());
+            // Validate: no READY_MADE_GIFT_SET in custom box
+            if (variant.getProduct().getProductType() == ProductType.READY_MADE_GIFT_SET) {
+                throw new BadRequestException("Ready-made gift sets cannot be added to a custom box");
             }
 
-            GiftBoxItem item = GiftBoxItem.builder()
+            // Validate: REGULAR products must be custom box eligible
+            if (variant.getProduct().getProductType() == ProductType.REGULAR
+                    && Boolean.FALSE.equals(variant.getProduct().getIsCustomBoxEligible())) {
+                throw new BadRequestException("Product is not eligible for custom box: " + variant.getProduct().getName());
+            }
+
+            if (variant.getStatus() != ProductStatus.AVAILABLE) {
+                throw new BadRequestException("Product variant is not available: " + variant.getSku());
+            }
+
+            GiftBoxConfigItem item = GiftBoxConfigItem.builder()
                     .config(config)
-                    .product(product)
+                    .productVariantId(variant.getId())
                     .quantity(itemRequest.quantity())
                     .build();
             items.add(item);
         }
-        giftBoxItemRepository.saveAll(items);
+        giftBoxConfigItemRepository.saveAll(items);
         config.getItems().addAll(items);
 
         return toGiftBoxResponse(config);
@@ -135,98 +128,78 @@ public class GiftBoxService {
     }
 
     private GiftBoxResponse toGiftBoxResponse(GiftBoxConfig config) {
-        List<GiftBoxItem> items = giftBoxItemRepository.findByConfigId(config.getId());
+        List<GiftBoxConfigItem> items = giftBoxConfigItemRepository.findByConfigId(config.getId());
 
         List<GiftBoxResponse.GiftBoxItemResponse> itemResponses = items.stream()
                 .map(item -> {
-                    Product product = item.getProduct();
-                    BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
+                    Product product = variant.getProduct();
+
+                    // PACKAGING_ACCESSORY is free in custom box context
+                    BigDecimal price = product.getProductType() == ProductType.PACKAGING_ACCESSORY
+                            ? BigDecimal.ZERO
+                            : variant.getPrice();
+
+                    BigDecimal subtotal = price.multiply(BigDecimal.valueOf(item.getQuantity()));
                     return new GiftBoxResponse.GiftBoxItemResponse(
                             item.getId(),
-                            product.getId(),
+                            variant.getId(),
                             product.getName(),
-                            product.getPrice(),
+                            variant.getSku(),
+                            price,
                             item.getQuantity(),
                             subtotal
                     );
                 }).toList();
 
         // Calculate total price
-        BigDecimal totalPrice = config.getBoxProduct().getPrice();
+        BigDecimal totalPrice = BigDecimal.ZERO;
+        for (GiftBoxConfigItem item : items) {
+            ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
+            Product product = variant.getProduct();
 
-        if (config.getWrappingProduct() != null) {
-            totalPrice = totalPrice.add(config.getWrappingProduct().getPrice());
+            BigDecimal price = product.getProductType() == ProductType.PACKAGING_ACCESSORY
+                    ? BigDecimal.ZERO
+                    : variant.getPrice();
+            totalPrice = totalPrice.add(price.multiply(BigDecimal.valueOf(item.getQuantity())));
         }
-        if (config.getRibbonProduct() != null) {
-            totalPrice = totalPrice.add(config.getRibbonProduct().getPrice());
-        }
-        if (config.getCardProduct() != null) {
-            totalPrice = totalPrice.add(config.getCardProduct().getPrice());
-        }
-        for (GiftBoxItem item : items) {
-            totalPrice = totalPrice.add(item.getProduct().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
-        }
+
+        // Add box price
+        ProductVariant boxVariant = productVariantRepository.findById(config.getBoxVariantId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", config.getBoxVariantId()));
+        totalPrice = totalPrice.add(boxVariant.getPrice());
 
         GiftBoxResponse.BoxProductResponse boxResponse = new GiftBoxResponse.BoxProductResponse(
-                config.getBoxProduct().getId(),
-                config.getBoxProduct().getName(),
-                config.getBoxProduct().getPrice(),
-                getThumbnailUrl(config.getBoxProduct())
+                boxVariant.getId(),
+                boxVariant.getProduct().getName(),
+                boxVariant.getPrice()
         );
-
-        GiftBoxResponse.ProductResponse wrappingResponse = toProductResponse(config.getWrappingProduct());
-        GiftBoxResponse.ProductResponse ribbonResponse = toProductResponse(config.getRibbonProduct());
-        GiftBoxResponse.ProductResponse cardResponse = toProductResponse(config.getCardProduct());
 
         return new GiftBoxResponse(
                 config.getId(),
                 boxResponse,
-                wrappingResponse,
-                ribbonResponse,
-                cardResponse,
-                config.getGreetingMessage(),
                 itemResponses,
                 totalPrice
         );
     }
 
-    private GiftBoxResponse.ProductResponse toProductResponse(Product product) {
-        if (product == null) return null;
-        return new GiftBoxResponse.ProductResponse(
-                product.getId(),
-                product.getName(),
-                product.getPrice(),
-                getThumbnailUrl(product)
-        );
-    }
+    private ProductVariant getVariantAndValidateType(UUID variantId, ProductType expectedType) {
+        ProductVariant variant = productVariantRepository.findById(variantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", variantId));
 
-    private String getThumbnailUrl(Product product) {
-        if (product == null || product.getImages() == null) return null;
-        return product.getImages().stream()
-                .filter(ProductImage::getIsThumbnail)
-                .map(ProductImage::getSecureUrl)
-                .findFirst()
-                .orElseGet(() -> product.getImages().stream()
-                        .map(ProductImage::getSecureUrl)
-                        .findFirst()
-                        .orElse(null));
-    }
-
-    private Product getProductAndValidateType(UUID productId, ProductType expectedType) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
-
-        if (product.getStatus() != ProductStatus.AVAILABLE) {
-            throw new BadRequestException("Product is not available: " + product.getName());
+        if (variant.getStatus() != ProductStatus.AVAILABLE) {
+            throw new BadRequestException("Product variant is not available: " + variant.getSku());
         }
 
-        if (product.getProductType() != expectedType) {
+        if (variant.getProduct().getProductType() != expectedType) {
             throw new BadRequestException(
-                    "Product type mismatch: expected " + expectedType + ", got " + product.getProductType()
+                    "Product type mismatch: expected " + expectedType + ", got " + variant.getProduct().getProductType()
             );
         }
 
-        return product;
+        return variant;
     }
 
     private UUID getCurrentUserId(String email) {

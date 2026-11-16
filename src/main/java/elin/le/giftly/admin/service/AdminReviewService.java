@@ -1,12 +1,11 @@
 package elin.le.giftly.admin.service;
 
 import elin.le.giftly.cloudinary.service.CloudinaryService;
-import elin.le.giftly.common.enums.ReviewStatus;
-import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.product.entity.ProductImage;
 import elin.le.giftly.review.dto.ReviewResponse;
 import elin.le.giftly.review.entity.Review;
+import elin.le.giftly.review.entity.ReviewImage;
 import elin.le.giftly.review.repository.ReviewRepository;
 import elin.le.giftly.user.entity.User;
 import elin.le.giftly.user.repository.UserRepository;
@@ -16,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -27,23 +27,15 @@ public class AdminReviewService {
     private final CloudinaryService cloudinaryService;
 
     @Transactional(readOnly = true)
-    public Page<ReviewResponse> getAllReviews(
-            UUID productId,
-            UUID userId,
-            ReviewStatus status,
-            Pageable pageable) {
-        
-        if (productId != null && status != null) {
-            return reviewRepository.findByProductIdAndStatus(productId, status, pageable).map(this::toReviewResponse);
+    public Page<ReviewResponse> getAllReviews(UUID productId, UUID userId, Pageable pageable) {
+        if (productId != null && userId != null) {
+            return reviewRepository.findByProductIdAndUserId(productId, userId, pageable).map(this::toReviewResponse);
         }
         if (productId != null) {
             return reviewRepository.findByProductId(productId, pageable).map(this::toReviewResponse);
         }
         if (userId != null) {
             return reviewRepository.findByUserId(userId, pageable).map(this::toReviewResponse);
-        }
-        if (status != null) {
-            return reviewRepository.findByStatusOrderByCreatedAtDesc(status, pageable).map(this::toReviewResponse);
         }
         return reviewRepository.findAll(pageable).map(this::toReviewResponse);
     }
@@ -66,22 +58,14 @@ public class AdminReviewService {
     }
 
     @Transactional
-    public void updateReviewStatus(UUID reviewId, ReviewStatus status) {
-        Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
-        
-        review.setStatus(status);
-        reviewRepository.save(review);
-    }
-
-    @Transactional
     public void deleteReview(UUID reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
 
-        // Delete associated image from Cloudinary if exists
-        if (review.getReviewImage() != null && review.getReviewImage().getPublicId() != null) {
-            cloudinaryService.deleteImage(review.getReviewImage().getPublicId());
+        for (ReviewImage img : review.getImages()) {
+            if (img.getPublicId() != null) {
+                cloudinaryService.deleteImage(img.getPublicId());
+            }
         }
 
         reviewRepository.delete(review);
@@ -100,21 +84,20 @@ public class AdminReviewService {
             );
         }
 
-        String reviewImageUrl = null;
-        if (review.getReviewImage() != null) {
-            reviewImageUrl = review.getReviewImage().getImageUrl();
-        }
+        List<String> imageUrls = review.getImages().stream()
+                .map(ReviewImage::getSecureUrl)
+                .toList();
 
         return new ReviewResponse(
                 review.getId(),
                 review.getUserId(),
                 user != null ? user.getEmail() : null,
                 productInfo,
+                review.getProductVariantId(),
                 review.getRating() != null ? review.getRating().intValue() : null,
                 review.getTitle(),
                 review.getComment(),
-                review.getStatus(),
-                reviewImageUrl,
+                imageUrls,
                 review.getCreatedAt(),
                 review.getUpdatedAt()
         );
