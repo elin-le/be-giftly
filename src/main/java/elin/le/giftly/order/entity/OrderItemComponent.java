@@ -60,6 +60,12 @@ public class OrderItemComponent {
     @Column(name = "message_rendering_method")
     private MessageRenderingMethod messageRenderingMethod;
 
+    @Column(name = "is_perishable_snapshot")
+    private Boolean isPerishableSnapshot;
+
+    @Column(name = "shelf_life_hours_snapshot")
+    private Integer shelfLifeHoursSnapshot;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "return_policy_snapshot")
     private ReturnPolicy returnPolicySnapshot;

@@ -1,5 +1,7 @@
 package elin.le.giftly.user.service;
 
+import elin.le.giftly.auth.repository.UserRoleRepository;
+import elin.le.giftly.common.enums.UserStatus;
 import elin.le.giftly.common.mapper.UserMapper;
 import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
@@ -20,6 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +35,7 @@ import static org.mockito.Mockito.*;
 class UserServiceTest {
 
     @Mock private UserRepository userRepository;
+    @Mock private UserRoleRepository userRoleRepository;
     @Mock private UserMapper userMapper;
     @Mock private PasswordEncoder passwordEncoder;
     @InjectMocks private UserService userService;
@@ -39,12 +43,15 @@ class UserServiceTest {
     @Test
     @DisplayName("Should return current user")
     void shouldReturnCurrentUser() throws Exception {
-        User user = User.builder().id(UUID.randomUUID()).email("test@example.com").fullName("Test").build();
+        UUID userId = UUID.randomUUID();
+        User user = User.builder().id(userId).email("test@example.com").fullName("Test").status(UserStatus.ACTIVE).build();
         setSecretCode("test123");
         mockCurrentUser(user);
-        UserResponse response = mock(UserResponse.class);
-        when(userMapper.toResponse(user)).thenReturn(response);
-        assertEquals(response, userService.getCurrentUser());
+        when(userRoleRepository.findRoleNamesByUserId(userId)).thenReturn(List.of("USER"));
+        UserResponse result = userService.getCurrentUser();
+        assertNotNull(result);
+        assertEquals("test@example.com", result.email());
+        assertEquals(List.of("USER"), result.roles());
     }
 
     @Test
@@ -58,28 +65,30 @@ class UserServiceTest {
     @Test
     @DisplayName("Should update user profile")
     void shouldUpdateUser() throws Exception {
-        User user = User.builder().id(UUID.randomUUID()).email("test@example.com").fullName("Test").build();
+        UUID userId = UUID.randomUUID();
+        User user = User.builder().id(userId).email("test@example.com").fullName("Test").status(UserStatus.ACTIVE).build();
         setSecretCode("test123");
         mockCurrentUser(user);
         when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        UserResponse response = mock(UserResponse.class);
-        when(userMapper.toResponse(user)).thenReturn(response);
-        userService.updateUser(new UpdateUserRequest("New Name", "0999999999"));
+        when(userRoleRepository.findRoleNamesByUserId(userId)).thenReturn(List.of("USER"));
+        UserResponse result = userService.updateUser(new UpdateUserRequest("New Name", "0999999999"));
         assertEquals("New Name", user.getFullName());
+        assertEquals(List.of("USER"), result.roles());
     }
 
     @Test
     @DisplayName("Should update admin profile with correct secret code")
     void shouldUpdateAdminProfile() throws Exception {
-        User user = User.builder().id(UUID.randomUUID()).email("test@example.com").fullName("Test").build();
+        UUID userId = UUID.randomUUID();
+        User user = User.builder().id(userId).email("test@example.com").fullName("Test").status(UserStatus.ACTIVE).build();
         setSecretCode("test123");
         mockCurrentUser(user);
         when(passwordEncoder.encode("newPassword")).thenReturn("encoded");
         when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        UserResponse response = mock(UserResponse.class);
-        when(userMapper.toResponse(user)).thenReturn(response);
-        userService.updateAdminProfile(new UpdateAdminProfileRequest("test123", "New Name", "0999999999", "newPassword"));
+        when(userRoleRepository.findRoleNamesByUserId(userId)).thenReturn(List.of("ADMIN", "USER"));
+        UserResponse result = userService.updateAdminProfile(new UpdateAdminProfileRequest("test123", "New Name", "0999999999", "newPassword"));
         assertEquals("New Name", user.getFullName());
+        assertEquals(List.of("ADMIN", "USER"), result.roles());
     }
 
     @Test

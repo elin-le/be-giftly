@@ -2,7 +2,6 @@ package elin.le.giftly.test;
 
 import elin.le.giftly.admin.dto.CreateCategoryRequest;
 import elin.le.giftly.admin.dto.CreateProductRequest;
-import elin.le.giftly.admin.dto.ImageInfo;
 import elin.le.giftly.auth.entity.Role;
 import elin.le.giftly.auth.entity.UserRole;
 import elin.le.giftly.cart.dto.AddCartItemRequest;
@@ -115,17 +114,8 @@ public class TestDataFactory {
      * Create a test product with images.
      */
     public static Product createProductWithImage(Category category) {
-        Product product = createProduct(category);
-        ProductImage image = ProductImage.builder()
-                .product(product)
-                .imageUrl("https://test.com/image.jpg")
-                .secureUrl("https://test.com/image.jpg")
-                .publicId("test-image")
-                .isThumbnail(true)
-                .build();
-        image.setId(UUID.randomUUID());
-        product.setImages(List.of(image));
-        return product;
+        // Images now belong to ProductVariant, not Product
+        return createProduct(category);
     }
 
     /**

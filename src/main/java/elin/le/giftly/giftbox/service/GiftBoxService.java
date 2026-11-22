@@ -1,7 +1,7 @@
 package elin.le.giftly.giftbox.service;
 
-import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.common.enums.ProductType;
+import elin.le.giftly.common.enums.VariantStatus;
 import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.giftbox.dto.CreateGiftBoxRequest;
@@ -69,7 +69,7 @@ public class GiftBoxService {
                 throw new BadRequestException("Product is not eligible for custom box: " + variant.getProduct().getName());
             }
 
-            if (variant.getStatus() != ProductStatus.AVAILABLE) {
+            if (variant.getStatus() != VariantStatus.AVAILABLE) {
                 throw new BadRequestException("Product variant is not available: " + variant.getSku());
             }
 
@@ -189,7 +189,7 @@ public class GiftBoxService {
         ProductVariant variant = productVariantRepository.findById(variantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", variantId));
 
-        if (variant.getStatus() != ProductStatus.AVAILABLE) {
+        if (variant.getStatus() != VariantStatus.AVAILABLE) {
             throw new BadRequestException("Product variant is not available: " + variant.getSku());
         }
 

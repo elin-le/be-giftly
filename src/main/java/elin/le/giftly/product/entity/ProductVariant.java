@@ -1,6 +1,6 @@
 package elin.le.giftly.product.entity;
 
-import elin.le.giftly.common.enums.ProductStatus;
+import elin.le.giftly.common.enums.VariantStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -40,19 +40,17 @@ public class ProductVariant {
     private Double width;
     private Double height;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "dimension_unit")
     private String dimensionUnit;
 
     private Double weight;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "weight_unit")
     private String weightUnit;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ProductStatus status;
+    private VariantStatus status;
 
     @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -64,4 +62,8 @@ public class ProductVariant {
 
     @OneToOne(mappedBy = "variant", cascade = CascadeType.ALL, orphanRemoval = true)
     private ProductVariantPolicy variantPolicy;
+
+    @OneToMany(mappedBy = "productVariant", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ProductImage> images = new ArrayList<>();
 }

@@ -19,11 +19,7 @@ public class ProductImage {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id")
-    private Product product;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_variant_id")
+    @JoinColumn(name = "product_variant_id", nullable = false)
     private ProductVariant productVariant;
 
     @Column(name = "image_url", nullable = false)
@@ -35,6 +31,9 @@ public class ProductImage {
     @Column(name = "public_id", nullable = false)
     private String publicId;
 
-    @Column(name = "is_thumbnail")
-    private Boolean isThumbnail;
+    @Column(name = "is_primary")
+    private Boolean isPrimary;
+
+    @Column(name = "display_order")
+    private Integer displayOrder;
 }

@@ -235,19 +235,15 @@ ALTER TABLE order_item_component ADD COLUMN message_rendering_method VARCHAR(20)
 ALTER TABLE order_item_component ADD COLUMN return_policy_snapshot VARCHAR(20);
 ALTER TABLE order_item_component ADD COLUMN advance_payment_percent_snapshot NUMERIC(5, 2);
 
--- Migrate product_id to product_variant_id
-UPDATE order_item_component oic
-SET product_variant_id = pv.id,
-    product_name_snapshot = oic.component_name
-FROM product_variant pv
-WHERE pv.product_id = oic.product_id
-AND pv.sku LIKE 'DEFAULT-%';
+-- Note: order_item_component does not have a product_id column in the original schema,
+-- so there is no migration needed for product_variant_id here.
+-- The product_variant_id column was added above for future use.
 
 -- =============================================================================
 -- 12. Update Order table
 -- =============================================================================
 
-ALTER TABLE order ADD COLUMN required_advance_amount NUMERIC(19, 2);
+ALTER TABLE "order" ADD COLUMN required_advance_amount NUMERIC(19, 2);
 
 -- =============================================================================
 -- 13. Update Payment table
@@ -270,10 +266,16 @@ WHERE pv.product_id = r.product_id
 AND pv.sku LIKE 'DEFAULT-%';
 
 -- =============================================================================
--- 15. Update Review Image table
+-- 15. Create Review Image table (did not exist in V1 schema)
 -- =============================================================================
 
-ALTER TABLE review_image ADD COLUMN secure_url VARCHAR(500) NOT NULL DEFAULT '';
+CREATE TABLE review_image (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    review_id UUID NOT NULL,
+    url VARCHAR(500) NOT NULL,
+    secure_url VARCHAR(500) NOT NULL DEFAULT '',
+    CONSTRAINT fk_review_image_review FOREIGN KEY (review_id) REFERENCES "review"(id)
+);
 
 -- =============================================================================
 -- 16. Create indexes

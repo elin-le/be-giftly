@@ -49,7 +49,7 @@ public class ProductService {
             );
         } else {
             products = productRepository.findProductsCursor(
-                    categoryId, null, cursorUuid, pageRequest
+                    categoryId, null, cursorUuid, limit
             );
         }
 

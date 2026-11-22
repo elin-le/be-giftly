@@ -21,27 +21,29 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     List<Product> findByCategoryIdAndStatus(UUID categoryId, ProductStatus status);
 
     // Cursor-based pagination with optional filters (price filter removed - price is on Variant)
+    // Using native query with explicit type hints to avoid Hibernate/PostgreSQL type mismatch
     @Query(value = """
-            SELECT p FROM Product p
-            LEFT JOIN p.category c
-            WHERE (:categoryId IS NULL OR p.category.id = :categoryId)
-            AND (:keyword IS NULL OR (p.name ILIKE CONCAT('%', :keyword, '%') OR p.description ILIKE CONCAT('%', :keyword, '%')))
-            AND (:cursor IS NULL OR p.id < :cursor)
+            SELECT p.* FROM product p
+            LEFT JOIN category c ON c.id = p.category_id
+            WHERE (CAST(:categoryId AS uuid) IS NULL OR c.id = CAST(:categoryId AS uuid))
+            AND (:keyword IS NULL OR (LOWER(p.name) LIKE LOWER('%' || CAST(:keyword AS varchar) || '%') OR LOWER(p.description) LIKE LOWER('%' || CAST(:keyword AS varchar) || '%')))
+            AND (CAST(:cursor AS uuid) IS NULL OR p.id < CAST(:cursor AS uuid))
             ORDER BY p.id DESC
-            """)
+            LIMIT :limit
+            """, nativeQuery = true)
     List<Product> findProductsCursor(
             @Param("categoryId") UUID categoryId,
             @Param("keyword") String keyword,
             @Param("cursor") UUID cursor,
-            org.springframework.data.domain.Pageable pageable
+            @Param("limit") int limit
     );
 
     // Native query for fuzzy search with pg_trgm similarity
     @Query(value = """
             SELECT p.* FROM product p
             WHERE (p.name % :keyword OR p.description % :keyword)
-            AND (:categoryId IS NULL::uuid OR p.category_id = :categoryId)
-            AND (:cursor IS NULL::uuid OR p.id < :cursor)
+            AND (CAST(:categoryId AS uuid) IS NULL OR p.category_id = CAST(:categoryId AS uuid))
+            AND (CAST(:cursor AS uuid) IS NULL OR p.id < CAST(:cursor AS uuid))
             ORDER BY p.id DESC
             LIMIT :limit
             """, nativeQuery = true)

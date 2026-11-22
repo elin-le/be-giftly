@@ -13,6 +13,7 @@ public interface UserMapper {
     @Mapping(target = "fullName", source = "fullName")
     @Mapping(target = "phone", source = "phone")
     @Mapping(target = "status", source = "status")
+    @Mapping(target = "roles", ignore = true)
     @Mapping(target = "createdAt", source = "createdAt")
     UserResponse toResponse(User user);
 }

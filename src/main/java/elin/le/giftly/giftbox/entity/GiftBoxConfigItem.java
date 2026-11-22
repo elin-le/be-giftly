@@ -1,5 +1,6 @@
 package elin.le.giftly.giftbox.entity;
 
+import elin.le.giftly.common.enums.MessageRenderingMethod;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,4 +28,11 @@ public class GiftBoxConfigItem {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    @Column(name = "message_text")
+    private String messageText;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_rendering_method")
+    private MessageRenderingMethod messageRenderingMethod;
 }

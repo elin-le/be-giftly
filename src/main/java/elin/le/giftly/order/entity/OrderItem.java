@@ -60,6 +60,12 @@ public class OrderItem {
     @Column(name = "advance_payment_percent_snapshot", precision = 5, scale = 2)
     private BigDecimal advancePaymentPercentSnapshot;
 
+    @Column(name = "is_perishable_snapshot")
+    private Boolean isPerishableSnapshot;
+
+    @Column(name = "shelf_life_hours_snapshot")
+    private Integer shelfLifeHoursSnapshot;
+
     @Column(name = "required_advance_amount", precision = 19, scale = 2)
     private BigDecimal requiredAdvanceAmount;
 

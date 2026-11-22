@@ -12,7 +12,6 @@ import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.product.entity.Product;
-import elin.le.giftly.product.entity.ProductImage;
 import elin.le.giftly.product.entity.ProductVariant;
 import elin.le.giftly.product.repository.ProductRepository;
 import elin.le.giftly.product.repository.ProductVariantRepository;
@@ -67,7 +66,7 @@ public class CartService {
         ProductVariant variant = productVariantRepository.findById(request.productVariantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", request.productVariantId()));
 
-        if (variant.getStatus() != ProductStatus.AVAILABLE) {
+        if (variant.getStatus() != elin.le.giftly.common.enums.VariantStatus.AVAILABLE) {
             throw new BadRequestException("Product variant is not available");
         }
 
@@ -154,7 +153,7 @@ public class CartService {
                 ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
                         .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
                 Product product = variant.getProduct();
-                String thumbnailUrl = getThumbnailUrl(product);
+                String thumbnailUrl = getThumbnailUrl(variant);
                 BigDecimal itemTotal = variant.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
 
                 itemResponses.add(new CartItemResponse(
@@ -176,14 +175,14 @@ public class CartService {
         return new CartResponse(cart.getId(), itemResponses, subtotal, totalItems);
     }
 
-    private String getThumbnailUrl(Product product) {
-        if (product == null || product.getImages() == null) return null;
-        return product.getImages().stream()
-                .filter(ProductImage::getIsThumbnail)
-                .map(ProductImage::getSecureUrl)
+    private String getThumbnailUrl(ProductVariant variant) {
+        if (variant == null || variant.getImages() == null || variant.getImages().isEmpty()) return null;
+        return variant.getImages().stream()
+                .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
+                .map(elin.le.giftly.product.entity.ProductImage::getSecureUrl)
                 .findFirst()
-                .orElseGet(() -> product.getImages().stream()
-                        .map(ProductImage::getSecureUrl)
+                .orElseGet(() -> variant.getImages().stream()
+                        .map(elin.le.giftly.product.entity.ProductImage::getSecureUrl)
                         .findFirst()
                         .orElse(null));
     }

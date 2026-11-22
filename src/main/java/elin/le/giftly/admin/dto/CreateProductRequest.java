@@ -24,5 +24,5 @@ public record CreateProductRequest(
 
     Boolean isCustomBoxEligible,
 
-    List<ImageInfo> images
+    List<CreateVariantRequest> variants
 ) {}

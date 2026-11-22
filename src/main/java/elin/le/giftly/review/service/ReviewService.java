@@ -9,7 +9,8 @@ import elin.le.giftly.order.entity.OrderItem;
 import elin.le.giftly.order.repository.OrderItemRepository;
 import elin.le.giftly.order.repository.OrderRepository;
 import elin.le.giftly.product.entity.Product;
-import elin.le.giftly.product.entity.ProductImage;
+import elin.le.giftly.product.entity.ProductVariant;
+import elin.le.giftly.product.repository.ProductVariantRepository;
 import elin.le.giftly.review.dto.CreateReviewRequest;
 import elin.le.giftly.review.dto.ReviewResponse;
 import elin.le.giftly.review.entity.Review;
@@ -45,6 +46,7 @@ public class ReviewService {
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
     private final Cloudinary cloudinary;
+    private final ProductVariantRepository productVariantRepository;
 
     @Transactional
     public ReviewResponse createReview(CreateReviewRequest request, MultipartFile imageFile) {
@@ -174,7 +176,7 @@ public class ReviewService {
 
         ReviewResponse.ProductInfo productInfo = null;
         if (product != null) {
-            String thumbnailUrl = getThumbnailUrl(product);
+            String thumbnailUrl = getThumbnailUrl(review.getProductVariantId());
             productInfo = new ReviewResponse.ProductInfo(
                     product.getId(),
                     product.getName(),
@@ -201,14 +203,16 @@ public class ReviewService {
         );
     }
 
-    private String getThumbnailUrl(Product product) {
-        if (product == null || product.getImages() == null) return null;
-        return product.getImages().stream()
-                .filter(ProductImage::getIsThumbnail)
-                .map(ProductImage::getSecureUrl)
+    private String getThumbnailUrl(UUID productVariantId) {
+        if (productVariantId == null) return null;
+        ProductVariant variant = productVariantRepository.findById(productVariantId).orElse(null);
+        if (variant == null || variant.getImages() == null || variant.getImages().isEmpty()) return null;
+        return variant.getImages().stream()
+                .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
+                .map(elin.le.giftly.product.entity.ProductImage::getSecureUrl)
                 .findFirst()
-                .orElseGet(() -> product.getImages().stream()
-                        .map(ProductImage::getSecureUrl)
+                .orElseGet(() -> variant.getImages().stream()
+                        .map(elin.le.giftly.product.entity.ProductImage::getSecureUrl)
                         .findFirst()
                         .orElse(null));
     }

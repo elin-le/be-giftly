@@ -35,11 +35,9 @@ public class GiftBoxVariantDetail {
     @Column(name = "max_weight", precision = 19, scale = 2)
     private BigDecimal maxWeight;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "dimension_unit")
     private String dimensionUnit;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "weight_unit")
     private String weightUnit;
 }

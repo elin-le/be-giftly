@@ -1,5 +1,6 @@
 package elin.le.giftly.user.service;
 
+import elin.le.giftly.auth.repository.UserRoleRepository;
 import elin.le.giftly.common.mapper.UserMapper;
 import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
@@ -15,11 +16,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -31,7 +35,16 @@ public class UserService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-        return userMapper.toResponse(user);
+        List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
+        return new UserResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhone(),
+                user.getStatus(),
+                roles,
+                user.getCreatedAt()
+        );
     }
 
     @Transactional
@@ -48,7 +61,16 @@ public class UserService {
         }
 
         user = userRepository.save(user);
-        return userMapper.toResponse(user);
+        List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
+        return new UserResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhone(),
+                user.getStatus(),
+                roles,
+                user.getCreatedAt()
+        );
     }
 
     @Transactional
@@ -73,6 +95,15 @@ public class UserService {
         }
 
         user = userRepository.save(user);
-        return userMapper.toResponse(user);
+        List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
+        return new UserResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhone(),
+                user.getStatus(),
+                roles,
+                user.getCreatedAt()
+        );
     }
 }

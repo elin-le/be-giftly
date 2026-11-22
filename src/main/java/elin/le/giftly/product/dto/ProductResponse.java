@@ -28,7 +28,16 @@ public record ProductResponse(
             String imageUrl,
             String publicId,
             String secureUrl,
-            Boolean isThumbnail
+            Boolean isPrimary,
+            Integer displayOrder
+    ) {
+    }
+
+    public record OptionValueInfo(
+            UUID optionValueId,
+            String optionName,
+            String value,
+            String colorHex
     ) {
     }
 
@@ -37,7 +46,9 @@ public record ProductResponse(
             String sku,
             BigDecimal price,
             Integer stockQuantity,
-            String status
+            String status,
+            List<ImageResponse> images,
+            List<OptionValueInfo> optionValues
     ) {
     }
 }

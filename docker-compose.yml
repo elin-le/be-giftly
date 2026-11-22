@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-giftly
+    environment:
+      POSTGRES_USER: ledan
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: giftly
+    volumes:
+      - postgres_giftly_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+volumes:
+  postgres_giftly_data:

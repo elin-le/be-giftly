@@ -45,6 +45,9 @@ public class BundleOptionGroup {
     @Column(name = "is_required")
     private Boolean isRequired;
 
+    @Column(name = "display_order")
+    private Integer displayOrder;
+
     @OneToMany(mappedBy = "optionGroup", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BundleOption> options = new ArrayList<>();

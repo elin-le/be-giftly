@@ -7,7 +7,5 @@ public enum WeightUnit {
     @Schema(description = "Grams")
     G,
     @Schema(description = "Kilograms")
-    KG,
-    @Schema(description = "Pounds")
-    LB
+    KG
 }

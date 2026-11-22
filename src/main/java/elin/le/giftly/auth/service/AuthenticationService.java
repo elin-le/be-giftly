@@ -17,6 +17,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Service
 public class AuthenticationService {
 
@@ -45,7 +49,7 @@ public class AuthenticationService {
         this.userDetailsService = userDetailsService;
     }
 
-    public AuthResponse login(LoginRequest request) {
+    public Map<String, Object> login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
@@ -57,10 +61,34 @@ public class AuthenticationService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        return new AuthResponse(accessToken, refreshToken, user.getEmail(), user.getFullName());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("authResponse", new AuthResponse(accessToken, user.getEmail(), user.getFullName()));
+        result.put("refreshToken", refreshToken);
+        return result;
     }
 
-    public AuthResponse register(RegisterRequest request) {
+    public Map<String, Object> refreshToken(String refreshTokenCookie) {
+        // Validate the refresh token by extracting username and checking expiration
+        String username = jwtUtil.extractUsername(refreshTokenCookie);
+        Date expiration = jwtUtil.extractExpiration(refreshTokenCookie);
+        if (expiration.before(new Date())) {
+            throw new RuntimeException("Refresh token has expired");
+        }
+
+        // Load user details and generate new access token only (no token rotation)
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String newAccessToken = jwtUtil.generateAccessToken(userDetails);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("authResponse", new AuthResponse(newAccessToken, user.getEmail(), user.getFullName()));
+        result.put("refreshToken", refreshTokenCookie);
+        return result;
+    }
+
+    public Map<String, Object> register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
@@ -92,6 +120,9 @@ public class AuthenticationService {
         String accessToken = jwtUtil.generateAccessToken(userDetails);
         String refreshToken = jwtUtil.generateRefreshToken(userDetails);
 
-        return new AuthResponse(accessToken, refreshToken, user.getEmail(), user.getFullName());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("authResponse", new AuthResponse(accessToken, user.getEmail(), user.getFullName()));
+        result.put("refreshToken", refreshToken);
+        return result;
     }
 }
