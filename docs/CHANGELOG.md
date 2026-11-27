@@ -1,5 +1,19 @@
 # Changelog — Giftly Backend
 
+## v1.17 — 2026-11-27
+
+### Thêm
+- **Mua hộp quà custom độc lập với cart** — `POST /api/gift-boxes/{giftBoxId}/purchase` tạo đơn trực tiếp từ cấu hình đã lưu, không thêm hộp vào cart và không xóa/thay đổi cart.
+- **Validate cấu hình khi mua** — Bắt buộc đúng một hộp và tối thiểu 3 món không phải phụ kiện/thiệp; xác minh eligibility, trạng thái, tồn kho, trọng lượng và kích thước lòng hộp.
+- **Snapshot thành phần đơn hàng** — Lưu variant, SKU, tên, giá và lời nhắn từng thành phần; trừ tồn kho khi đặt và hoàn tồn khi hủy.
+
+### Cơ sở dữ liệu và xác minh
+- **V21** — Cho phép cột tên/loại legacy của `order_item_component` nhận `NULL` khi ghi snapshot mới.
+- **V22** — Gỡ `gift_box_config_id` khỏi `cart_item`, xóa liên kết custom-box cũ trong cart nhưng giữ nguyên cấu hình; ràng buộc cart chỉ chứa product variant.
+- Thêm regression tests cho migration và các giới hạn mua hộp custom; cập nhật API/database docs.
+
+---
+
 ## v1.16 — 2026-11-27
 
 ### Thêm

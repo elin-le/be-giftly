@@ -475,9 +475,7 @@ Thiệp là Product loại `GREETING_CARD`. Có thể là tùy chọn compliment
 
 ### `cart_item`
 
-Đúng một nguồn được đặt:
-- `product_variant_id`: sản phẩm thường, Ready-made Gift Set, hoặc Ready-made Gift Box;
-- `gift_box_config_id`: Custom Gift Box.
+Chỉ chứa một product variant thường, Ready-made Gift Set hoặc Ready-made Gift Box. Custom Gift Box được mua độc lập từ `gift_box_config`, không được gắn vào cart.
 
 `cart_item_option_selection` lưu các tùy chọn bundle, số lượng, nội dung thông điệp và lựa chọn viết tay/in.
 
@@ -485,16 +483,13 @@ Thiệp là Product loại `GREETING_CARD`. Có thể là tùy chọn compliment
 |-----|------|-----------|-------|
 | `id` | UUID | **PK**, DEFAULT gen_random_uuid() | ID mục giỏ hàng |
 | `cart_id` | UUID | NOT NULL, **FK** → `cart(id)` | Giỏ hàng cha |
-| `product_variant_id` | UUID | NULLABLE, **FK** → `product_variant(id)` | Variant sản phẩm |
-| `gift_box_config_id` | UUID | NULLABLE, **FK** → `gift_box_config(id)` | Cấu hình Custom Box |
+| `product_variant_id` | UUID | CHECK `IS NOT NULL` | ID variant sản phẩm |
 | `quantity` | INTEGER | NOT NULL | Số lượng |
 
 **Constraints:**
-- `chk_cart_item_type` CHECK (
-    (product_variant_id IS NOT NULL AND gift_box_config_id IS NULL) OR
-    (product_variant_id IS NULL AND gift_box_config_id IS NOT NULL)
-  )
-  — Một CartItem chỉ có thể là Product Variant HOẶC GiftBoxConfig, không được cả hai.
+- `chk_cart_item_type` CHECK (`product_variant_id IS NOT NULL`) — CartItem chỉ chứa Product Variant.
+
+Migration V22 xóa liên kết custom-box cũ khỏi cart nhưng giữ nguyên `gift_box_config`; dùng `POST /api/gift-boxes/{giftBoxId}/purchase` để tạo đơn riêng.
 
 **Indexes:**
 - `idx_cart_item_cart` ON `cart_item`(cart_id)
@@ -801,7 +796,7 @@ erDiagram
     BUNDLE_OPTION_GROUP ||--o{ BUNDLE_OPTION : "contains"
 
     GIFT_BOX_CONFIG ||--o{ GIFT_BOX_CONFIG_ITEM : "contains"
-    GIFT_BOX_CONFIG ||--o{ CART_ITEM : "selected"
+    GIFT_BOX_CONFIG ||--o{ ORDER_ITEM : "purchased_directly"
 
     CART ||--o{ CART_ITEM : "contains"
     CART_ITEM ||--o{ CART_ITEM_OPTION_SELECTION : "has"

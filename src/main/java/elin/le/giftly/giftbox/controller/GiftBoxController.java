@@ -5,7 +5,10 @@ import elin.le.giftly.giftbox.dto.CreateGiftBoxRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxItemRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxComponentRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxResponse;
+import elin.le.giftly.giftbox.dto.PurchaseGiftBoxRequest;
 import elin.le.giftly.giftbox.service.GiftBoxService;
+import elin.le.giftly.order.dto.OrderResponse;
+import elin.le.giftly.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +27,17 @@ import java.util.UUID;
 public class GiftBoxController {
 
     private final GiftBoxService giftBoxService;
+    private final OrderService orderService;
+
+    @PostMapping("/{giftBoxId}/purchase")
+    @Operation(summary = "Purchase custom gift box", description = "Create an order directly from a saved custom gift box, independently of the shopping cart")
+    public ResponseEntity<ApiResponse<OrderResponse>> purchaseGiftBox(
+            @Parameter(description = "Saved custom gift box ID", required = true)
+            @PathVariable UUID giftBoxId,
+            @Valid @RequestBody PurchaseGiftBoxRequest request) {
+        OrderResponse order = orderService.createGiftBoxOrder(giftBoxId, request);
+        return ResponseEntity.ok(ApiResponse.success("Custom gift box order created successfully", order));
+    }
 
     @PostMapping
     @Operation(summary = "Create gift box", description = "Create a new custom gift box with selected products")

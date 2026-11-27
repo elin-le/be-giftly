@@ -7,46 +7,15 @@
 ## Entity-Relationship Diagram
 
 ```
-┌──────────┐       ┌───────────┐       ┌──────────┐
-│   user   │──┐    │ user_role │──┐    │   role   │
-└────┬─────┘  │    └───────────┘  │    └──────────┘
-     │        │                    │
-     │ 1:N    │ 1:N                │ 1:N
-     │  ┌─────┴──┐          ┌──────┴───┐
-     │  │ address │          │ category │
-     │  └────────┘          └────┬─────┘
-     │ 1:N                       │ 1:N
-     │  ┌────────┐          ┌────┴──────────┐
-     │  │  cart   │          │   product     │
-     │  └────┬────┘          └──────┬────────┘
-     │ 1:N   │ 1:N                 │ 1:N
-     │  ┌────┴────┐          ┌─────┴──────────┐
-     │  │cart_item │          │ product_image  │
-     │  └────┬────┘          └────────────────┘
-     │       │
-     ▼       ▼
-┌──────────┐  ┌────────────────┐
-│  order   │  │ gift_box_config │
-└────┬─────┘  └────────┬───────┘
-     │ 1:N             │ 1:N
-     │  ┌──────────────┴──┐
-     │  │  order_item     │
-     │  └────────┬────────┘
-     │ 1:N       │ 1:N
-     │  ┌────────┴────────┐   ┌──────────────┐
-     │  │order_item_      │   │   payment    │
-     │  │  component      │   └──────────────┘
-     │  └─────────────────┘
-     │ 1:N
-     │  ┌──────────────┐
-     └─►│    review     │
-        └──────┬───────┘
-               │ 1:1
-               ▼
-        ┌──────────────┐
-        │ review_image  │
-        └──────────────┘
+user ──┬── address
+       ├── cart ── cart_item ── product_variant ── product ── product_image
+       ├── gift_box_config ── gift_box_config_item ── product_variant
+       └── order ── order_item ── order_item_component
+                           ├── payment
+                           └── review ── review_image
 ```
+
+`cart_item` và `gift_box_config` là hai luồng độc lập: hộp custom được đặt trực tiếp từ cấu hình đã lưu, không được gắn vào cart.
 
 ---
 
@@ -170,7 +139,7 @@ Hình ảnh sản phẩm (lưu trên Cloudinary).
 
 #### `gift_box_config`
 
-Cấu hình hộp quà tùy chỉnh do người dùng tạo. Thành phần hộp, giấy gói, ruy-băng, thiệp và các lựa chọn cùng loại được lưu ở `gift_box_config_item` như variant product; nội dung hộp cũng ở bảng này nhưng không có `component_type`.
+Cấu hình hộp quà tùy chỉnh do người dùng tạo và mua độc lập với cart. Thành phần hộp, giấy gói, ruy-băng, thiệp và các lựa chọn cùng loại được lưu ở `gift_box_config_item` như variant product; nội dung hộp cũng ở bảng này nhưng không có `component_type`.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -220,17 +189,17 @@ Giỏ hàng của người dùng.
 
 #### `cart_item`
 
-Mục trong giỏ hàng — có thể là sản phẩm thường HOẶC một gift box config.
+Mục trong giỏ hàng — chỉ đại diện một product variant thường; hộp custom không nằm trong cart.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | **PK**, `GenerationType.UUID` | Unique item identifier |
 | `cart_id` | UUID | **NOT NULL**, FK → `cart(id)` (`@ManyToOne`, LAZY) | Giỏ hàng cha |
-| `product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm thường (mutually exclusive với gift_box_config_id) |
-| `gift_box_config_id` | UUID | NULL, FK → `gift_box_config(id)` (`@ManyToOne`, LAZY) | Gift box config (mutually exclusive với product_id) |
+| `product_variant_id` | UUID | CHECK `IS NOT NULL` | ID variant của sản phẩm |
+| `product_id` | UUID | NULL, legacy | Cột cũ không còn được dùng cho cart item mới |
 | `quantity` | INTEGER | **NOT NULL** | Số lượng |
 
-**Business rule:** Một `cart_item` chỉ có thể có `product_id` **hoặc** `gift_box_config_id`, không được có cả hai.
+**Business rule:** `cart_item` chỉ chứa một `product_variant_id`. Migration V22 xóa các liên kết hộp custom cũ khỏi cart (không xóa cấu hình hộp) và loại bỏ cột `gift_box_config_id`. Hộp custom được đặt qua `POST /api/gift-boxes/{giftBoxId}/purchase`.
 
 ---
 
@@ -265,9 +234,12 @@ Mục trong đơn hàng — snapshot tại thời điểm đặt hàng (tên, gi
 |--------|------|-------------|-------------|
 | `id` | UUID | **PK**, `GenerationType.UUID` | Unique item identifier |
 | `order_id` | UUID | **NOT NULL**, FK → `order(id)` (`@ManyToOne`, LAZY) | Đơn hàng cha |
-| `product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm thường (mutually exclusive với gift_box_config_id) |
-| `gift_box_config_id` | UUID | NULL, FK → `gift_box_config(id)` (`@ManyToOne`, LAZY) | Gift box config (mutually exclusive với product_id) |
-| `item_name` | VARCHAR | **NOT NULL** | Tên mục (snapshot) |
+| `product_variant_id` | UUID | NULL, FK → `product_variant(id)` | Variant nếu dòng hàng là sản phẩm thường |
+| `gift_box_config_id` | UUID | NULL, FK → `gift_box_config(id)` | Cấu hình nếu dòng hàng là hộp quà custom |
+| `product_id` | UUID | NULL, legacy | Cột cũ, không dùng khi tạo order item mới |
+| `item_name_snapshot` | VARCHAR(255) | **NOT NULL** | Tên sản phẩm/hộp tại thời điểm đặt hàng |
+| `sku_snapshot` | VARCHAR(255) | NULL | SKU tại thời điểm đặt hàng |
+| `item_name` | VARCHAR | NULL, legacy | Tên cũ; nullable từ migration V16 |
 | `unit_price` | NUMERIC(19,2) | **NOT NULL** | Giá đơn vị tại thời điểm đặt |
 | `quantity` | INTEGER | **NOT NULL** | Số lượng |
 | `subtotal` | NUMERIC(19,2) | **NOT NULL** | Tổng = unit_price × quantity |
@@ -284,12 +256,22 @@ Các thành phần chi tiết của một gift box order item (hộp, giấy gó
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | **PK**, `GenerationType.UUID` | Unique component identifier |
-| `order_item_id` | UUID | NULL, FK → `order_item(id)` (`@ManyToOne`, LAZY) | Order item cha |
-| `product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm tương ứng (nếu có) |
-| `component_name` | VARCHAR | NULL | Tên thành phần |
-| `component_type` | VARCHAR | NULL | Loại thành phần (BOX, WRAPPING, RIBBON, CARD, CONTENT, v.v.) |
-| `unit_price` | NUMERIC(19,2) | NULL | Giá đơn vị thành phần |
-| `quantity` | INTEGER | NULL | Số lượng thành phần |
+| `order_item_id` | UUID | **NOT NULL**, FK → `order_item(id)` (`@ManyToOne`, LAZY) | Order item cha |
+| `product_variant_id` | UUID | NULL | Variant thành phần |
+| `component_role` | VARCHAR(20) | NULL | Vai trò snapshot: hộp, sản phẩm, phụ kiện hoặc thiệp |
+| `product_name_snapshot` | VARCHAR(255) | NULL | Tên thành phần tại lúc đặt hàng |
+| `sku_snapshot` | VARCHAR(255) | NULL | SKU thành phần tại lúc đặt hàng |
+| `variant_snapshot` | JSON | NULL | Snapshot thuộc tính variant |
+| `quantity` | INTEGER | NULL | Số lượng thành phần cho mỗi hộp |
+| `unit_price` | NUMERIC(19,2) | NULL | Giá thành phần tại thời điểm đặt |
+| `is_complimentary` | BOOLEAN | NULL | Thành phần có được miễn phí không |
+| `message_text`, `message_rendering_method` | VARCHAR | NULL | Nội dung và cách in lời nhắn trên thiệp |
+| `is_perishable_snapshot`, `shelf_life_hours_snapshot` | BOOLEAN / INTEGER | NULL | Snapshot hạn sử dụng |
+| `return_policy_snapshot` | VARCHAR | NULL | Snapshot chính sách đổi trả |
+| `advance_payment_percent_snapshot` | NUMERIC(5,2) | NULL | Snapshot tỷ lệ đặt cọc |
+| `component_name`, `component_type` | VARCHAR | NULL | Cột legacy, nullable từ migration V21 |
+
+Khi hủy đơn, tồn kho các thành phần được hoàn lại theo số lượng trong hộp nhân số hộp đã đặt.
 
 ---
 
@@ -446,8 +428,7 @@ category (1) ──── (N) product
 product (1) ──── (N) product_image
 
 gift_box_config (1) ──── (N) gift_box_item
-gift_box_config (1) ──── (N) cart_item  (optional — product_id is null)
-gift_box_config (1) ──── (N) order_item (optional — product_id is null)
+gift_box_config (1) ──── (N) order_item (hộp custom được đặt độc lập)
 ```
 
 ---
@@ -479,7 +460,7 @@ gift_box_config (1) ──── (N) order_item (optional — product_id is null
 | 8 | `gift_box_config` | `GiftBoxConfig` | `id` (UUID) | `box_product_id`, `wrapping_product_id`, `ribbon_product_id`, `card_product_id` | — |
 | 9 | `gift_box_item` | `GiftBoxItem` | `id` (UUID) | `config_id`, `product_id` | — |
 | 10 | `cart` | `Cart` | `id` (UUID) | `user_id` | — |
-| 11 | `cart_item` | `CartItem` | `id` (UUID) | `cart_id`, `product_id`, `gift_box_config_id` | — |
+| 11 | `cart_item` | `CartItem` | `id` (UUID) | `cart_id` | — |
 | 12 | `order` | `Order` | `id` (UUID) | `user_id`, `address_id` | `order_number` |
 | 13 | `order_item` | `OrderItem` | `id` (UUID) | `order_id`, `product_id`, `gift_box_config_id` | — |
 | 14 | `order_item_component` | `OrderItemComponent` | `id` (UUID) | `order_item_id`, `product_id` | — |

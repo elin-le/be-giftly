@@ -834,9 +834,9 @@ GET /api/categories
 
 ---
 
-### 4.5. Bundles (Không cần auth)
+### 4.5. Bundles và hộp quà custom
 
-Các API bundle dùng để lấy cấu hình gói quà, tùy chọn, và chính sách biến thể.
+Các API tra cứu bundle không yêu cầu đăng nhập; endpoint mua hộp custom cần xác thực người dùng.
 
 #### 4.5.1. Lấy nhóm tùy chọn bundle
 
@@ -957,6 +957,27 @@ GET /api/bundles/variants/{variantId}/gift-box-detail
 
 ---
 
+#### 4.5.5. Mua hộp quà custom (Cần auth)
+
+```http
+POST /api/gift-boxes/{giftBoxId}/purchase
+```
+
+**Request Body:**
+
+```json
+{
+  "addressId": "uuid",
+  "quantity": 1
+}
+```
+
+Endpoint tạo đơn trực tiếp từ cấu hình hộp đã lưu, độc lập với cart và không thêm/xóa cart item. Backend kiểm tra quyền sở hữu cấu hình, hộp và các component bắt buộc, số lượng tối thiểu/tối đa, tồn kho, khối lượng và kích thước; hộp phải có ít nhất 3 món không phải phụ kiện/thiệp.
+
+**Response (200):** Trả `OrderResponse`; `items` chứa một order item hộp custom với `giftBoxConfigId` và danh sách `components` snapshot.
+
+---
+
 ### 4.6. Shopping Cart (Cần auth)
 
 #### 4.6.1. Lấy giỏ hàng
@@ -1006,6 +1027,8 @@ POST /api/cart/items
   "quantity": 1
 }
 ```
+
+Giỏ hàng chỉ nhận `productVariantId` của sản phẩm thường. Hộp quà custom được mua riêng qua `POST /api/gift-boxes/{giftBoxId}/purchase`, không được thêm vào hoặc checkout cùng giỏ hàng.
 
 **Response (200):** Trả về `CartResponse` đã cập nhật.
 
@@ -1104,16 +1127,20 @@ POST /api/orders
       {
         "id": "uuid",
         "productVariantId": "uuid",
+        "giftBoxConfigId": null,
         "itemName": "Gấu bông Teddy",
         "unitPrice": 50000,
         "quantity": 2,
-        "subtotal": 100000
+        "subtotal": 100000,
+        "components": []
       }
     ]
   },
   "timestamp": "2026-11-22T17:00:00"
 }
 ```
+
+Đơn hộp quà custom được tạo độc lập qua endpoint mua hộp bên dưới; `giftBoxConfigId` và `components` trong order item lưu cấu hình cùng snapshot tên, SKU, loại, số lượng, giá và lời nhắn tại thời điểm đặt hàng. Tồn kho hộp và từng thành phần được trừ khi đặt hàng, hoàn lại khi hủy đơn.
 
 ---
 

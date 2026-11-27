@@ -8,12 +8,10 @@ import elin.le.giftly.cart.entity.Cart;
 import elin.le.giftly.cart.entity.CartItem;
 import elin.le.giftly.cart.repository.CartItemRepository;
 import elin.le.giftly.cart.repository.CartRepository;
-import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.product.entity.Product;
 import elin.le.giftly.product.entity.ProductVariant;
-import elin.le.giftly.product.repository.ProductRepository;
 import elin.le.giftly.product.repository.ProductVariantRepository;
 import elin.le.giftly.user.entity.User;
 import elin.le.giftly.user.repository.UserRepository;
@@ -34,7 +32,6 @@ public class CartService {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
-    private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
 
@@ -104,12 +101,18 @@ public class CartService {
         CartItem item = cartItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart Item", "id", itemId));
 
-        if (item.getProductVariantId() != null) {
-            ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
-            if (variant.getStockQuantity() < request.quantity()) {
-                throw new BadRequestException("Insufficient stock. Available: " + variant.getStockQuantity());
-            }
+        UUID userId = getCurrentUserId(SecurityContextHolder.getContext().getAuthentication().getName());
+        if (!item.getCart().getUserId().equals(userId)) {
+            throw new BadRequestException("You do not have access to this cart item");
+        }
+
+        if (item.getProductVariantId() == null) {
+            throw new BadRequestException("Cart item must contain a product variant");
+        }
+        ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
+        if (variant.getStockQuantity() < request.quantity()) {
+            throw new BadRequestException("Insufficient stock. Available: " + variant.getStockQuantity());
         }
 
         item.setQuantity(request.quantity());
@@ -125,6 +128,10 @@ public class CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("Cart Item", "id", itemId));
 
         Cart cart = item.getCart();
+        UUID userId = getCurrentUserId(SecurityContextHolder.getContext().getAuthentication().getName());
+        if (!cart.getUserId().equals(userId)) {
+            throw new BadRequestException("You do not have access to this cart item");
+        }
         cart.getItems().remove(item);
         cartItemRepository.delete(item);
 
@@ -149,27 +156,27 @@ public class CartService {
         int totalItems = 0;
 
         for (CartItem item : items) {
-            if (item.getProductVariantId() != null) {
-                ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
-                Product product = variant.getProduct();
-                String thumbnailUrl = getThumbnailUrl(variant);
-                BigDecimal itemTotal = variant.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-
-                itemResponses.add(new CartItemResponse(
-                        item.getId(),
-                        variant.getId(),
-                        product.getName(),
-                        variant.getPrice(),
-                        thumbnailUrl,
-                        item.getQuantity()
-                ));
-
-                subtotal = subtotal.add(itemTotal);
-                totalItems += item.getQuantity();
-            } else if (item.getGiftBoxConfig() != null) {
-                // Custom gift box item - handled separately
+            if (item.getProductVariantId() == null) {
+                throw new BadRequestException("Cart item must contain a product variant");
             }
+
+            ProductVariant variant = productVariantRepository.findById(item.getProductVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", item.getProductVariantId()));
+            Product product = variant.getProduct();
+            String thumbnailUrl = getThumbnailUrl(variant);
+            BigDecimal itemTotal = variant.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+
+            itemResponses.add(new CartItemResponse(
+                    item.getId(),
+                    variant.getId(),
+                    product.getName(),
+                    variant.getPrice(),
+                    thumbnailUrl,
+                    item.getQuantity()
+            ));
+
+            subtotal = subtotal.add(itemTotal);
+            totalItems += item.getQuantity();
         }
 
         return new CartResponse(cart.getId(), itemResponses, subtotal, totalItems);
