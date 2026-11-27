@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,36 +21,51 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     Page<Product> findByProductType(ProductType productType, Pageable pageable);
     List<Product> findByCategoryIdAndStatus(UUID categoryId, ProductStatus status);
 
-    // Cursor-based pagination with optional filters (price filter removed - price is on Variant)
-    // Using native query with explicit type hints to avoid Hibernate/PostgreSQL type mismatch
+    // Product prices are stored on variants; all supplied filters are combined in this cursor query.
     @Query(value = """
             SELECT p.* FROM product p
-            LEFT JOIN category c ON c.id = p.category_id
-            WHERE (CAST(:categoryId AS uuid) IS NULL OR c.id = CAST(:categoryId AS uuid))
-            AND (:keyword IS NULL OR (LOWER(p.name) LIKE LOWER('%' || CAST(:keyword AS varchar) || '%') OR LOWER(p.description) LIKE LOWER('%' || CAST(:keyword AS varchar) || '%')))
+            WHERE (CAST(:categoryId AS uuid) IS NULL OR p.category_id = CAST(:categoryId AS uuid))
+            AND (CAST(:keyword AS varchar) IS NULL OR (
+                unaccent(lower(p.name)) LIKE '%' || unaccent(lower(CAST(:keyword AS varchar))) || '%'
+                OR unaccent(lower(COALESCE(p.description, ''))) LIKE '%' || unaccent(lower(CAST(:keyword AS varchar))) || '%'
+                OR regexp_replace(unaccent(lower(concat_ws(' ', p.name, p.description))), '[[:space:]]+', '', 'g')
+                   LIKE '%' || regexp_replace(unaccent(lower(CAST(:keyword AS varchar))), '[[:space:]]+', '', 'g') || '%'
+                OR unaccent(lower(concat_ws(' ', p.name, p.description))) % unaccent(lower(CAST(:keyword AS varchar)))
+                OR (
+                    SELECT bool_and(
+                        unaccent(lower(concat_ws(' ', p.name, p.description))) LIKE '%' || word || '%'
+                        OR unaccent(lower(concat_ws(' ', p.name, p.description))) % word
+                    )
+                    FROM unnest(regexp_split_to_array(unaccent(lower(CAST(:keyword AS varchar))), '[[:space:]]+')) AS words(word)
+                    WHERE word <> ''
+                )
+            ))
+            AND (CAST(:productType AS varchar) IS NULL OR p.product_type = CAST(:productType AS varchar))
+            AND (CAST(:customComponentType AS varchar) IS NULL
+                 OR p.custom_component_type = CAST(:customComponentType AS varchar))
+            AND (CAST(:customBoxEligible AS boolean) IS NULL
+                 OR p.is_custom_box_eligible = CAST(:customBoxEligible AS boolean))
+            AND (
+                (CAST(:minPrice AS numeric) IS NULL AND CAST(:maxPrice AS numeric) IS NULL)
+                OR EXISTS (
+                    SELECT 1 FROM product_variant v
+                    WHERE v.product_id = p.id
+                    AND (CAST(:minPrice AS numeric) IS NULL OR v.price >= CAST(:minPrice AS numeric))
+                    AND (CAST(:maxPrice AS numeric) IS NULL OR v.price <= CAST(:maxPrice AS numeric))
+                )
+            )
             AND (CAST(:cursor AS uuid) IS NULL OR p.id < CAST(:cursor AS uuid))
             ORDER BY p.id DESC
             LIMIT :limit
             """, nativeQuery = true)
-    List<Product> findProductsCursor(
+    List<Product> searchProductsCursor(
             @Param("categoryId") UUID categoryId,
             @Param("keyword") String keyword,
-            @Param("cursor") UUID cursor,
-            @Param("limit") int limit
-    );
-
-    // Native query for fuzzy search with pg_trgm similarity
-    @Query(value = """
-            SELECT p.* FROM product p
-            WHERE (p.name % :keyword OR p.description % :keyword)
-            AND (CAST(:categoryId AS uuid) IS NULL OR p.category_id = CAST(:categoryId AS uuid))
-            AND (CAST(:cursor AS uuid) IS NULL OR p.id < CAST(:cursor AS uuid))
-            ORDER BY p.id DESC
-            LIMIT :limit
-            """, nativeQuery = true)
-    List<Product> fuzzySearchProductsNative(
-            @Param("keyword") String keyword,
-            @Param("categoryId") UUID categoryId,
+            @Param("productType") String productType,
+            @Param("customComponentType") String customComponentType,
+            @Param("customBoxEligible") Boolean customBoxEligible,
+            @Param("minPrice") BigDecimal minPrice,
+            @Param("maxPrice") BigDecimal maxPrice,
             @Param("cursor") UUID cursor,
             @Param("limit") int limit
     );

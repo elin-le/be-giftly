@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -16,8 +15,6 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     Page<Review> findByProductId(UUID productId, Pageable pageable);
     Page<Review> findByUserId(UUID userId, Pageable pageable);
     Page<Review> findByProductIdAndUserId(UUID productId, UUID userId, Pageable pageable);
-    
-    List<Review> findByProductIdOrderByCreatedAtDesc(UUID productId);
     
     @Query("SELECT COALESCE(AVG(r.rating), 0.0) FROM Review r WHERE r.product.id = :productId")
     double findAverageRatingByProductId(@Param("productId") UUID productId);
@@ -31,6 +28,5 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     @Query("SELECT r FROM Review r WHERE r.userId = :userId ORDER BY r.createdAt DESC")
     Page<Review> findByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId, Pageable pageable);
 
-    @Query("SELECT r FROM Review r WHERE r.product.id = :productId AND r.rating = :rating ORDER BY r.createdAt DESC")
-    Page<Review> findByProductIdAndRating(@Param("productId") UUID productId, @Param("rating") Short rating, Pageable pageable);
+    Page<Review> findByProductIdAndRating(UUID productId, Short rating, Pageable pageable);
 }

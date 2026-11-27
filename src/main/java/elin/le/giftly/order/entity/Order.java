@@ -3,6 +3,7 @@ package elin.le.giftly.order.entity;
 import elin.le.giftly.common.enums.OrderStatus;
 import elin.le.giftly.payment.entity.Payment;
 import elin.le.giftly.user.entity.Address;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,6 +31,7 @@ public class Order {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "address_id", nullable = false)
+    @JsonIgnore
     private Address address;
 
     @Column(name = "order_number", nullable = false, unique = true)

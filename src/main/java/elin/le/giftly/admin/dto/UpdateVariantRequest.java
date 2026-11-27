@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record UpdateVariantRequest(
-    UUID id,
+    UUID id, // null = add new variant to existing product
 
     @Size(max = 100, message = "SKU must not exceed 100 characters")
     String sku,

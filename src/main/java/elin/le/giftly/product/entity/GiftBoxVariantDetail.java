@@ -1,5 +1,6 @@
 package elin.le.giftly.product.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,6 +22,7 @@ public class GiftBoxVariantDetail {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_variant_id", nullable = false, unique = true)
+    @JsonIgnore
     private ProductVariant variant;
 
     @Column(name = "inner_length")

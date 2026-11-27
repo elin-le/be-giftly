@@ -16,6 +16,7 @@ public record AdminOrderResponse(
         BigDecimal subtotal,
         BigDecimal shippingFee,
         BigDecimal totalAmount,
+        BigDecimal requiredAdvanceAmount,
         OrderStatus status,
         LocalDateTime orderedAt,
         AddressResponse address,

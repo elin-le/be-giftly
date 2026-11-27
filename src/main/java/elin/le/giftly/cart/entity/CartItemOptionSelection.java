@@ -1,6 +1,7 @@
 package elin.le.giftly.cart.entity;
 
 import elin.le.giftly.common.enums.MessageRenderingMethod;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,6 +22,7 @@ public class CartItemOptionSelection {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_item_id", nullable = false)
+    @JsonIgnore
     private CartItem cartItem;
 
     @Column(name = "bundle_option_id", nullable = false)

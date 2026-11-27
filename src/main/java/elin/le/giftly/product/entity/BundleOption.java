@@ -1,6 +1,7 @@
 package elin.le.giftly.product.entity;
 
 import elin.le.giftly.common.enums.PricingMode;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,6 +23,7 @@ public class BundleOption {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "option_group_id", nullable = false)
+    @JsonIgnore
     private BundleOptionGroup optionGroup;
 
     @Column(name = "product_variant_id", nullable = false)

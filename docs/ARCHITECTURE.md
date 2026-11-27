@@ -68,7 +68,7 @@ Giftly follows a **layered architecture** with clear separation of concerns. Eac
 | **Product** | `product/` | Product catalog browsing, category listing |
 | **Cart** | `cart/` | Shopping cart operations (add, update, remove, clear) |
 | **Order** | `order/` | Order creation, history, cancellation |
-| **Review** | `review/` | Product reviews with image upload |
+| **Review** | `review/` | Product reviews with Cloudinary image references |
 | **GiftBox** | `giftbox/` | Custom gift box creation and management |
 | **Payment** | `payment/` | Payment entity and repository |
 
@@ -126,14 +126,16 @@ Client → POST /api/orders → OrderController → OrderService
                                               ← OrderResponse
 ```
 
-### 4. Image Upload Flow
+### 4. Review Image Flow
 
 ```
-Client → Multipart request → Controller → Service → CloudinaryService
-                                              → Upload to Cloudinary API
-                                              ← { imageUrl, secureUrl, publicId }
-                                              → Save to database
+Client → Upload image directly to Cloudinary
+       ← { secure_url, public_id }
+Client → POST /api/reviews { images: [{ secureUrl, publicId }] }
+       → Controller → ReviewService → Save image references to database
 ```
+
+The backend does not receive image files or upload review images; it stores the Cloudinary metadata supplied by the client.
 
 ## Security Architecture
 

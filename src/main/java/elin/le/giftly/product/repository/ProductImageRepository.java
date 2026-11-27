@@ -12,4 +12,5 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, UUID
     List<ProductImage> findByProductVariantId(UUID productVariantId);
     void deleteByProductVariantId(UUID productVariantId);
     List<ProductImage> findByProductVariantIdAndIsPrimaryTrue(UUID productVariantId);
+    List<ProductImage> findByProductId(UUID productId);
 }

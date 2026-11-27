@@ -7,6 +7,7 @@ import elin.le.giftly.admin.dto.CreateVariantPolicyRequest;
 import elin.le.giftly.admin.dto.VariantImageRequest;
 import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.common.enums.ProductType;
+import elin.le.giftly.common.enums.CustomComponentType;
 import elin.le.giftly.common.enums.ReturnPolicy;
 import elin.le.giftly.common.enums.VariantStatus;
 import elin.le.giftly.product.entity.Category;
@@ -110,6 +111,7 @@ class AdminProductServiceIntegrationTest {
                 ProductType.REGULAR,
                 ProductStatus.AVAILABLE,
                 true,
+                null,
                 List.of(variant1, variant2)
         );
 
@@ -189,6 +191,7 @@ class AdminProductServiceIntegrationTest {
                 ProductType.REGULAR,
                 ProductStatus.AVAILABLE,
                 true,
+                null,
                 List.of(variant)
         );
 
@@ -225,6 +228,7 @@ class AdminProductServiceIntegrationTest {
                 ProductType.REGULAR,
                 ProductStatus.AVAILABLE,
                 false,
+                null,
                 null
         );
 
@@ -242,5 +246,36 @@ class AdminProductServiceIntegrationTest {
 
         List<ProductVariant> variants = productVariantRepository.findByProductId(savedProduct.getId());
         assertEquals(0, variants.size(), "Should have 0 variants");
+    }
+
+    @Test
+    @DisplayName("Should save custom component type and product images")
+    void shouldSaveCustomComponentTypeAndProductImages() {
+        VariantImageRequest image = new VariantImageRequest(
+                "https://example.com/ribbon.jpg",
+                "https://secure.example.com/ribbon.jpg",
+                "ribbon-public-id",
+                true,
+                0
+        );
+        CreateVariantRequest variant = new CreateVariantRequest(
+                "RIBBON-RED", new BigDecimal("5000"), 20,
+                null, null, null, null, null, null,
+                VariantStatus.AVAILABLE, null, null, null, null);
+        CreateProductRequest request = new CreateProductRequest(
+                testCategory.getId(), "Red silk ribbon", "Ribbon for custom gift boxes",
+                ProductType.PACKAGING_ACCESSORY, ProductStatus.AVAILABLE, false,
+                List.of(image), List.of(variant), CustomComponentType.RIBBON);
+
+        Product savedProduct = adminProductService.createProduct(request);
+        productRepository.flush();
+        entityManager.clear();
+
+        Product productFromDb = productRepository.findById(savedProduct.getId())
+                .orElseThrow(() -> new AssertionError("Product should exist in DB"));
+        assertEquals(CustomComponentType.RIBBON, productFromDb.getCustomComponentType());
+        assertEquals(1, productFromDb.getCommonImages().size());
+        assertEquals("https://secure.example.com/ribbon.jpg",
+                productFromDb.getCommonImages().get(0).getSecureUrl());
     }
 }

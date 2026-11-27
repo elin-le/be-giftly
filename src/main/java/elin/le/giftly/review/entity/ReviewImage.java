@@ -1,5 +1,6 @@
 package elin.le.giftly.review.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -23,10 +24,8 @@ public class ReviewImage {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "review_id", nullable = false)
+    @JsonIgnore
     private Review review;
-
-    @Column(name = "image_url", nullable = false)
-    private String imageUrl;
 
     @Column(name = "secure_url", nullable = false)
     private String secureUrl;

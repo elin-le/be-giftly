@@ -3,6 +3,7 @@ package elin.le.giftly.order.entity;
 import elin.le.giftly.common.enums.ComponentRole;
 import elin.le.giftly.common.enums.MessageRenderingMethod;
 import elin.le.giftly.common.enums.ReturnPolicy;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -26,6 +27,7 @@ public class OrderItemComponent {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_item_id")
+    @JsonIgnore
     private OrderItem orderItem;
 
     @Column(name = "product_variant_id")

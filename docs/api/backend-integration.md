@@ -72,12 +72,13 @@ BE có bảng `product_variant_option_value` để link variant với option val
 
 ### Đã sửa
 
-**A.** Trường `optionValues` đã được thêm vào `VariantResponse`:
+**A.** Trường `optionValues` và `finalPrice` đã được thêm vào `VariantResponse`:
 ```java
 public record VariantResponse(
     UUID id,
     String sku,
-    BigDecimal price,
+    BigDecimal price,           // Base price của variant
+    BigDecimal finalPrice,      // Base price + tổng priceAdjustment của option values
     Integer stockQuantity,
     String status,
     List<ImageResponse> images,
@@ -85,7 +86,15 @@ public record VariantResponse(
 ) {}
 ```
 
-**B.** Endpoint resolve variant đã được thêm:
+**B.** Trường `priceAdjustment` đã được thêm vào `ProductOptionValue`:
+```java
+@Column(name = "price_adjustment", precision = 19, scale = 2)
+private BigDecimal priceAdjustment = BigDecimal.ZERO;  // Mặc định 0
+```
+
+Cơ chế tính giá: `finalPrice = variant.price + sum(optionValues.priceAdjustment)`
+
+**C.** Endpoint resolve variant đã được thêm:
 ```
 GET /api/products/{productId}/resolve-variant?optionValueIds=id1,id2,id3
 ```
@@ -99,58 +108,71 @@ Response trả về variant khớp với các option value IDs đã chọn, bao 
 
 ---
 
-## 4. Bundle options — BE chưa có API tạo/quản lý
+## 4. Bundle options — ✓ Đã hoàn thành
 
-### Vấn đề
+### Vấn đề (Đã giải quyết)
 `BundleOptionController` chỉ có các GET endpoints để đọc bundle options, components, policy, gift-box-detail. **Không có POST/PUT** để tạo hoặc cập nhật bundle option groups và options cho một variant.
 
-### Hiện tại
-File: `src/main/java/elin/le/giftly/product/controller/BundleOptionController.java`
-
-Chỉ có:
-- `GET /api/bundles/variants/{variantId}/option-groups`
-- `GET /api/bundles/variants/{variantId}/components`
-- `GET /api/bundles/variants/{variantId}/policy`
-- `GET /api/bundles/variants/{variantId}/gift-box-detail`
-
-### Yêu cầu BE
-Thêm các admin endpoints để quản lý bundle:
+### Đã sửa
+Đã tạo `AdminBundleOptionController` với các admin endpoints:
 
 ```
-POST   /api/admin/bundles/variants/{variantId}/option-groups
-POST   /api/admin/bundles/option-groups/{groupId}/options
-PUT    /api/admin/bundles/option-groups/{groupId}
-PUT    /api/admin/bundles/options/{optionId}
-DELETE /api/admin/bundles/options/{optionId}
-DELETE /api/admin/bundles/option-groups/{groupId}
-
-POST   /api/admin/bundles/variants/{variantId}/components
-PUT    /api/admin/bundles/components/{componentId}
-DELETE /api/admin/bundles/components/{componentId}
+POST   /api/admin/bundle/option-groups          — Tạo bundle option group với options
+PUT    /api/admin/bundle/option-groups/{groupId} — Cập nhật bundle option group
+DELETE /api/admin/bundle/option-groups/{groupId} — Xóa bundle option group
+DELETE /api/admin/bundle/options/{optionId}     — Xóa bundle option
+POST   /api/admin/bundle/components             — Tạo bundle component
+DELETE /api/admin/bundle/components/{componentId} — Xóa bundle component
 ```
+
+Các DTO mới:
+- `CreateBundleOptionGroupRequest` — tạo nhóm tùy chọn bundle
+- `CreateBundleOptionRequest` — tạo option trong nhóm
+- `UpdateBundleOptionGroupRequest` — cập nhật nhóm tùy chọn
+- `CreateBundleComponentRequest` — tạo component (hộp, sản phẩm, phụ kiện, thiệp)
+
+`AdminBundleOptionService` xử lý logic CRUD với validation và cascade save/delete.
+
+### Kết luận
+- **FE có thể tạo/quản lý bundle options** qua admin endpoints.
+- **FE có thể tạo/quản lý bundle components** (hộp, sản phẩm, phụ kiện, thiệp).
+- **Workaround đã loại bỏ** — form tạo sản phẩm không cần cảnh báo vàng nữa.
 
 ---
 
-## 5. Ảnh chung của sản phẩm không có chỗ riêng ở BE
+## 5. Ảnh chung sản phẩm — ✓ Đã hoàn thành
 
-### Vấn đề
+### Vấn đề (Đã giải quyết)
 BE không có field `images` ở level Product — ảnh chỉ thuộc về ProductVariant. FE phải gắn ảnh chung vào variant đầu tiên như một workaround.
 
-### Hiện tại
-- `Product` entity không có relationship đến `ProductImage`.
-- `ProductVariant` có `List<ProductImage> images`.
-- `CreateProductRequest` không có field `images` ở level product.
+### Đã sửa
 
-### Yêu cầu BE
-Thêm relationship giữa Product và ProductImage:
-
+**A.** Thêm `product` field vào `ProductImage` entity:
 ```java
-// Trong Product entity
-@OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-private List<ProductImage> images = new ArrayList<>();
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "product_id")
+private Product product;
 ```
 
-Hoặc thêm field `images` vào `CreateProductRequest` và `UpdateProductRequest` để FE có thể upload ảnh chung của sản phẩm.
+**B.** Thêm `commonImages` list vào `Product` entity:
+```java
+@OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+private List<ProductImage> commonImages = new ArrayList<>();
+```
+
+**C.** Thêm `commonImages` field vào `CreateProductRequest` và `UpdateProductRequest`:
+```java
+List<VariantImageRequest> commonImages  // ← Ảnh chung của sản phẩm
+```
+
+**D.** `AdminProductService` giờ xử lý common images khi tạo/sửa product.
+
+**E.** `ProductMapper.toResponseWithDetails()` ưu tiên common images, nếu không có thì fallback vào ảnh của variant đầu tiên.
+
+### Kết luận
+- **FE có thể gửi ảnh chung** qua `commonImages` field trong request tạo/sửa sản phẩm.
+- **ProductResponse.images** giờ trả về common images (nếu có) thay vì ảnh của variant đầu tiên.
+- **Workaround đã loại bỏ** — không cần gắn ảnh chung vào variant đầu tiên.
 
 ---
 
@@ -188,21 +210,19 @@ Mỗi lần gọi `POST /api/auth/refresh`, BE chỉ tạo access token mới, r
 | 1 | Roles trong `/users/me` | Cao | ✓ Đã thêm field roles |
 | 2 | PUT product cập nhật variant | Cao | ✓ Đã thêm trường variants |
 | 3 | Variant ↔ Option value mapping | Cao | ✓ Đã thêm optionValues + resolve-variant |
-| 4 | Bundle options CRUD | Trung | ⏳ Chưa implement — cần admin endpoints |
-| 5 | Ảnh chung sản phẩm | Thấp | ⏳ Chưa implement — gắn vào variant đầu tiên |
+| 4 | Bundle options CRUD | Trung | ✓ Đã thêm 6 admin endpoints |
+| 5 | Ảnh chung sản phẩm | Thấp | ✓ Đã thêm commonImages relationship |
 | 6 | Refresh token rotation | Thấp | ✓ Đã loại bỏ rotation |
 
 ---
 
 ## Ghi chú FE
 
-**Workaround đã loại bỏ:**
+**Workaround đã loại bỏ (tất cả):**
 1. ~~**Roles:**~~ ✓ FE giờ dùng field `roles` từ `/api/users/me` — không cần đoán admin.
 2. ~~**PUT product:**~~ ✓ FE giờ gửi trường `variants` trong PUT request để cập nhật SKU, giá, tồn kho, ảnh.
 3. ~~**Variant mapping:**~~ ✓ FE giờ gọi `resolve-variant` endpoint để chọn biến thể theo màu/kích cỡ.
+4. ~~**Ảnh chung:**~~ ✓ FE giờ gửi `commonImages` trong request tạo/sửa sản phẩm — không cần gắn vào variant đầu tiên.
+5. ~~**Bundle options:**~~ ✓ FE giờ dùng 6 admin endpoints để quản lý bundle options và components — không cần cảnh báo vàng.
 
-**Workaround vẫn còn:**
-1. **Ảnh chung:** Gắn ảnh chung vào variant đầu tiên khi tạo sản phẩm (đợi BE thêm relationship Product → Image).
-2. **Bundle options:** Form tạo sản phẩm có cảnh báo vàng nói rõ lý do khi BE chưa có API (đợi BE thêm admin endpoints).
-
-Khi BE bổ sung các API còn lại (bundle CRUD, ảnh chung sản phẩm), FE sẽ loại bỏ các workaround còn lại và sử dụng API chính thức.
+**Tất cả gaps đã được BE hoàn thành.** FE có thể loại bỏ toàn bộ workaround và sử dụng API chính thức.

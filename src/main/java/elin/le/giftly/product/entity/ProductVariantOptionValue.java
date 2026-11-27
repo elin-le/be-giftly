@@ -1,5 +1,6 @@
 package elin.le.giftly.product.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,9 +21,11 @@ public class ProductVariantOptionValue {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "variant_id", nullable = false)
+    @JsonIgnore
     private ProductVariant variant;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "option_value_id", nullable = false)
+    @JsonIgnore
     private ProductOptionValue optionValue;
 }

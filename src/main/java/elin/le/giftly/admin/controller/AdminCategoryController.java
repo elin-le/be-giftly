@@ -4,6 +4,7 @@ import elin.le.giftly.admin.dto.CreateCategoryRequest;
 import elin.le.giftly.admin.dto.UpdateCategoryRequest;
 import elin.le.giftly.admin.service.AdminCategoryService;
 import elin.le.giftly.common.dto.ApiResponse;
+import elin.le.giftly.common.dto.PageResponse;
 import elin.le.giftly.product.entity.Category;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,11 +34,11 @@ public class AdminCategoryController {
 
     @GetMapping
     @Operation(summary = "Get all categories", description = "Retrieve all categories with pagination")
-    public ResponseEntity<ApiResponse<Page<Category>>> getAllCategories(
+    public ResponseEntity<ApiResponse<PageResponse<Category>>> getAllCategories(
             @Parameter(description = "Pagination parameters")
             @PageableDefault(size = 20) Pageable pageable) {
         Page<Category> categories = adminCategoryService.getAllCategories(pageable);
-        return ResponseEntity.ok(ApiResponse.success(categories));
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.from(categories)));
     }
 
     @GetMapping("/{categoryId}")

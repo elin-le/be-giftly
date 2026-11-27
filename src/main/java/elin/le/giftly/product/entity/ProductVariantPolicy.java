@@ -1,6 +1,7 @@
 package elin.le.giftly.product.entity;
 
 import elin.le.giftly.common.enums.ReturnPolicy;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,6 +23,7 @@ public class ProductVariantPolicy {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_variant_id", nullable = false, unique = true)
+    @JsonIgnore
     private ProductVariant variant;
 
     @Column(name = "is_perishable")

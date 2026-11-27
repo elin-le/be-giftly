@@ -7,11 +7,11 @@ import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.order.entity.Order;
 import elin.le.giftly.order.entity.OrderItem;
 import elin.le.giftly.order.repository.OrderItemRepository;
-import elin.le.giftly.order.repository.OrderRepository;
 import elin.le.giftly.product.entity.Product;
 import elin.le.giftly.product.entity.ProductVariant;
 import elin.le.giftly.product.repository.ProductVariantRepository;
 import elin.le.giftly.review.dto.CreateReviewRequest;
+import elin.le.giftly.review.dto.ReviewImageRequest;
 import elin.le.giftly.review.dto.ReviewResponse;
 import elin.le.giftly.review.entity.Review;
 import elin.le.giftly.review.entity.ReviewImage;
@@ -19,37 +19,29 @@ import elin.le.giftly.review.repository.ReviewRepository;
 import elin.le.giftly.user.entity.User;
 import elin.le.giftly.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import com.cloudinary.Cloudinary;
-
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final OrderItemRepository orderItemRepository;
-    private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
-    private final Cloudinary cloudinary;
     private final ProductVariantRepository productVariantRepository;
 
     @Transactional
-    public ReviewResponse createReview(CreateReviewRequest request, MultipartFile imageFile) {
+    public ReviewResponse createReview(CreateReviewRequest request) {
+        List<ReviewImageRequest> images = validateReviewImages(request.images());
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         UUID userId = getCurrentUserId(email);
 
@@ -68,10 +60,17 @@ public class ReviewService {
             );
         }
 
+        if (orderItem.getProductVariantId() == null) {
+            throw new BadRequestException("Only purchased product variants can be reviewed");
+        }
+        ProductVariant productVariant = productVariantRepository.findById(orderItem.getProductVariantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "ProductVariant", "id", orderItem.getProductVariantId()));
+
         // Build the review
         Review review = Review.builder()
                 .userId(userId)
-                .product(orderItem.getOrder() != null ? null : null)
+                .product(productVariant.getProduct())
                 .productVariantId(orderItem.getProductVariantId())
                 .orderItem(orderItem)
                 .rating(request.rating().shortValue())
@@ -79,52 +78,37 @@ public class ReviewService {
                 .comment(request.comment())
                 .build();
 
-        // Set product from variant if available
-        if (orderItem.getProductVariantId() != null) {
-            // Product is referenced via variant snapshot
+        for (ReviewImageRequest image : images) {
+            review.getImages().add(ReviewImage.builder()
+                    .review(review)
+                    .secureUrl(image.secureUrl())
+                    .publicId(image.publicId())
+                    .build());
         }
 
         review = reviewRepository.save(review);
-
-        // Handle image upload
-        if (imageFile != null && !imageFile.isEmpty()) {
-            uploadReviewImage(review, imageFile);
-        }
-
         return toReviewResponse(review);
     }
 
-    private void uploadReviewImage(Review review, MultipartFile imageFile) {
-        try {
-            Map<String, Object> uploadParams = new HashMap<>();
-            uploadParams.put("folder", "giftly/reviews");
-            
-            Map<String, Object> uploadResult = cloudinary.uploader().upload(imageFile.getBytes(), uploadParams);
-            
-            ReviewImage reviewImage = ReviewImage.builder()
-                    .review(review)
-                    .imageUrl((String) uploadResult.get("secure_url"))
-                    .secureUrl((String) uploadResult.get("secure_url"))
-                    .publicId((String) uploadResult.get("public_id"))
-                    .build();
-            
-            review.getImages().add(reviewImage);
-            reviewRepository.save(review);
-            log.info("Successfully uploaded review image for review: {}", review.getId());
-        } catch (Exception e) {
-            log.error("Failed to upload review image for review: {}", review.getId(), e);
-            throw new BadRequestException("Failed to upload review image");
+    private List<ReviewImageRequest> validateReviewImages(List<ReviewImageRequest> images) {
+        if (images == null || images.isEmpty()) {
+            return List.of();
         }
+        if (images.size() > 3) {
+            throw new BadRequestException("A review can have at most 3 images");
+        }
+
+        for (ReviewImageRequest image : images) {
+            if (image == null || image.publicId() == null || image.publicId().isBlank()
+                    || image.secureUrl() == null || !image.secureUrl().startsWith("https://")) {
+                throw new BadRequestException("Each review image must include a public ID and HTTPS secure URL");
+            }
+        }
+        return images;
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getReviewsByProduct(UUID productId) {
-        List<Review> reviews = reviewRepository.findByProductIdOrderByCreatedAtDesc(productId);
-        return reviews.stream().map(this::toReviewResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ReviewResponse> getReviewsByProductPaginated(UUID productId, Pageable pageable) {
+    public Page<ReviewResponse> getReviewsByProduct(UUID productId, Pageable pageable) {
         return reviewRepository.findByProductId(productId, pageable).map(this::toReviewResponse);
     }
 

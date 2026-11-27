@@ -2,6 +2,7 @@ package elin.le.giftly.admin.controller;
 
 import elin.le.giftly.admin.service.AdminReviewService;
 import elin.le.giftly.common.dto.ApiResponse;
+import elin.le.giftly.common.dto.PageResponse;
 import elin.le.giftly.review.dto.ReviewResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,7 +30,7 @@ public class AdminReviewController {
 
     @GetMapping
     @Operation(summary = "Get all reviews", description = "Retrieve all reviews with optional filtering by product or user with pagination")
-    public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getAllReviews(
+    public ResponseEntity<ApiResponse<PageResponse<ReviewResponse>>> getAllReviews(
             @Parameter(description = "Filter by product ID")
             @RequestParam(required = false) UUID productId,
             @Parameter(description = "Filter by user ID")
@@ -38,7 +39,7 @@ public class AdminReviewController {
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
         Page<ReviewResponse> reviews = adminReviewService.getAllReviews(productId, userId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(reviews));
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.from(reviews)));
     }
 
     @GetMapping("/{reviewId}")

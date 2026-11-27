@@ -1,11 +1,13 @@
 package elin.le.giftly.review.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
 import java.util.UUID;
 
 @Schema(description = "Request to create a new product review")
@@ -27,6 +29,7 @@ public record CreateReviewRequest(
         @Schema(description = "Review comment (optional)", example = "Excellent quality and fast delivery.")
         String comment,
 
-        @Schema(description = "Review image URL (optional, used if not uploading file)", example = "https://example.com/review-image.jpg")
-        String imageUrl
+        @Schema(description = "Cloudinary image metadata (optional, maximum 3 images)")
+        @Size(max = 3, message = "A review can have at most 3 images")
+        List<@Valid ReviewImageRequest> images
 ) {}

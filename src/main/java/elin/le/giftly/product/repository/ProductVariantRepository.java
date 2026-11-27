@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -12,4 +13,5 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     List<ProductVariant> findByProductId(UUID productId);
     List<ProductVariant> findByProductIdAndStatus(UUID productId, String status);
     ProductVariant findBySku(String sku);
+    Optional<ProductVariant> findByProductIdAndSku(UUID productId, String sku);
 }

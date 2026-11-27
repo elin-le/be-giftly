@@ -4,6 +4,7 @@ import elin.le.giftly.admin.dto.AdminOrderResponse;
 import elin.le.giftly.admin.dto.UpdateOrderStatusRequest;
 import elin.le.giftly.admin.service.AdminOrderService;
 import elin.le.giftly.common.dto.ApiResponse;
+import elin.le.giftly.common.dto.PageResponse;
 import elin.le.giftly.common.enums.OrderStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -32,7 +33,7 @@ public class AdminOrderController {
 
     @GetMapping
     @Operation(summary = "Get all orders", description = "Retrieve all orders with optional filtering by status or user with pagination")
-    public ResponseEntity<ApiResponse<Page<AdminOrderResponse>>> getAllOrders(
+    public ResponseEntity<ApiResponse<PageResponse<AdminOrderResponse>>> getAllOrders(
             @Parameter(description = "Filter by order status")
             @RequestParam(required = false) OrderStatus status,
             @Parameter(description = "Filter by user ID")
@@ -41,7 +42,7 @@ public class AdminOrderController {
             @PageableDefault(size = 20) Pageable pageable) {
 
         Page<AdminOrderResponse> orders = adminOrderService.getAllOrders(status, userId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(orders));
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.from(orders)));
     }
 
     @GetMapping("/{orderId}")

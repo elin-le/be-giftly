@@ -140,10 +140,11 @@ Sản phẩm trong catalog. Có thể là sản phẩm thường, hộp quà, gi
 | `category_id` | UUID | **NOT NULL**, FK → `category(id)` (`@ManyToOne`, LAZY) | Danh mục sản phẩm |
 | `name` | VARCHAR | **NOT NULL** | Tên sản phẩm |
 | `description` | VARCHAR | NULL | Mô tả sản phẩm |
-| `price` | NUMERIC(19,2) | **NOT NULL** | Giá sản phẩm |
-| `stock_quantity` | INTEGER | **NOT NULL** | Số lượng tồn kho |
-| `product_type` | VARCHAR (enum) | **NOT NULL** | `REGULAR`, `GIFT_BOX`, `WRAPPING`, `RIBBON`, `GREETING_CARD` |
+| `product_type` | VARCHAR (enum) | **NOT NULL** | Loại catalog (`REGULAR`, `READY_MADE_GIFT_BOX`, `PACKAGING_ACCESSORY`, ...) |
+| `custom_component_type` | VARCHAR (enum) | NULL | Nhóm lựa chọn custom (`BOX`, `WRAPPING`, `RIBBON`, `FILLER`, `GREETING_CARD`, `ACCESSORY`) |
 | `status` | VARCHAR (enum) | **NOT NULL** | `AVAILABLE`, `OUT_OF_STOCK`, `DISCONTINUED` |
+
+Giá, tồn kho và ảnh có thể khác nhau theo `product_variant`; ảnh cũng có thể gắn trực tiếp với product. Các vật phẩm custom vẫn là product/variant bình thường và tái sử dụng dữ liệu catalog này.
 
 **Quan hệ:**
 - `product` (1) → (N) `product_image` — `CascadeType.ALL`, `orphanRemoval=true`
@@ -169,34 +170,34 @@ Hình ảnh sản phẩm (lưu trên Cloudinary).
 
 #### `gift_box_config`
 
-Cấu hình hộp quà tùy chỉnh do người dùng tạo. Một config gồm hộp chính + các thành phần (giấy gói, ruy băng, thiệp) + danh sách sản phẩm bên trong.
+Cấu hình hộp quà tùy chỉnh do người dùng tạo. Thành phần hộp, giấy gói, ruy-băng, thiệp và các lựa chọn cùng loại được lưu ở `gift_box_config_item` như variant product; nội dung hộp cũng ở bảng này nhưng không có `component_type`.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | **PK**, `GenerationType.UUID` | Unique config identifier |
 | `user_id` | UUID | **NOT NULL**, FK → `user(id)` | Người tạo config |
-| `box_product_id` | UUID | **NOT NULL**, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm làm hộp chứa |
-| `wrapping_product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm giấy gói (optional) |
-| `ribbon_product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm ruy băng (optional) |
-| `card_product_id` | UUID | NULL, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm thiệp (optional) |
-| `greeting_message` | VARCHAR | NULL | Lời chúc tùy chỉnh |
 | `created_at` | TIMESTAMP | **NOT NULL**, auto-generated (`@CreationTimestamp`), updatable=false | Thời gian tạo |
 
+Các trường `updated_at`, `review_status`, `review_note`, `capacity_ratio` được dùng cho kiểm duyệt và đánh giá cấu hình.
+
 **Quan hệ:**
-- `gift_box_config` (1) → (N) `gift_box_item` — `CascadeType.ALL`, `orphanRemoval=true`
+- `gift_box_config` (1) → (N) `gift_box_config_item` — `CascadeType.ALL`, `orphanRemoval=true`
 
 ---
 
-#### `gift_box_item`
+#### `gift_box_config_item`
 
-Các sản phẩm bên trong một gift box config.
+Các lựa chọn thành phần và sản phẩm bên trong một cấu hình.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | **PK**, `GenerationType.UUID` | Unique item identifier |
 | `config_id` | UUID | **NOT NULL**, FK → `gift_box_config(id)` (`@ManyToOne`, LAZY) | Config cha |
-| `product_id` | UUID | **NOT NULL**, FK → `product(id)` (`@ManyToOne`, LAZY) | Sản phẩm trong hộp |
-| `quantity` | INTEGER | **NOT NULL** | Số lượng sản phẩm này trong hộp |
+| `product_variant_id` | UUID | **NOT NULL**, FK → `product_variant(id)` | Product variant được chọn |
+| `component_type` | VARCHAR (enum) | NULL | Nhóm custom; NULL nghĩa là món bên trong hộp |
+| `quantity` | INTEGER | **NOT NULL** | Thành phần custom luôn bằng 1; món bên trong có số lượng tùy chọn |
+
+**Business rule:** `UNIQUE (config_id, component_type)` giới hạn một lựa chọn cho mỗi nhóm trên một cấu hình; nhiều dòng nội dung được phép vì `component_type` là NULL. `BOX` là bắt buộc và được lưu như một dòng thành phần, không còn cột riêng trên `gift_box_config`.
 
 ---
 
@@ -332,7 +333,7 @@ Ghi nhận thanh toán cho đơn hàng.
 - **UNIQUE** (`order_item_id`) — mỗi order_item chỉ có một review
 
 **Quan hệ:**
-- `review` (1) → (1) `review_image` — `CascadeType.ALL`, `orphanRemoval=true`
+- `review` (1) → (N) `review_image` — `CascadeType.ALL`, `orphanRemoval=true`; tối đa 3 ảnh được giới hạn ở service.
 
 ---
 
@@ -344,9 +345,11 @@ Hình ảnh đính kèm review.
 |--------|------|-------------|-------------|
 | `id` | UUID | **PK**, `GenerationType.UUID` | Unique image identifier |
 | `review_id` | UUID | **NOT NULL**, FK → `review(id)` (`@ManyToOne`, LAZY) | Review cha |
-| `image_url` | VARCHAR | **NOT NULL** | URL của ảnh |
+| `secure_url` | VARCHAR | **NOT NULL** | URL HTTPS của ảnh trên Cloudinary |
 | `public_id` | VARCHAR | NULL | Cloudinary public ID |
 | `created_at` | TIMESTAMP | **NOT NULL**, auto-generated (`@CreationTimestamp`), updatable=false | Thời gian tạo |
+
+Migration V20 gộp giá trị URL cũ còn thiếu sang `secure_url`, sau đó loại bỏ cột trùng `image_url`.
 
 ---
 

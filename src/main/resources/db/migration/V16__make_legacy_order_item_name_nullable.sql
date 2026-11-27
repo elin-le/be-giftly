@@ -1,0 +1,1 @@
+ALTER TABLE order_item ALTER COLUMN item_name DROP NOT NULL;

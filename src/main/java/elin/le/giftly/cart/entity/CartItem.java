@@ -1,6 +1,7 @@
 package elin.le.giftly.cart.entity;
 
 import elin.le.giftly.giftbox.entity.GiftBoxConfig;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,6 +24,7 @@ public class CartItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", nullable = false)
+    @JsonIgnore
     private Cart cart;
 
     @Column(name = "product_variant_id")
@@ -30,6 +32,7 @@ public class CartItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gift_box_config_id")
+    @JsonIgnore
     private GiftBoxConfig giftBoxConfig;
 
     @Column(nullable = false)

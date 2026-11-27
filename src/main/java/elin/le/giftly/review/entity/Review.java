@@ -1,5 +1,6 @@
 package elin.le.giftly.review.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import elin.le.giftly.order.entity.OrderItem;
 import elin.le.giftly.order.entity.OrderItemComponent;
 import elin.le.giftly.product.entity.Product;
@@ -31,6 +32,7 @@ public class Review {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
+    @JsonIgnore
     private Product product;
 
     @Column(name = "product_variant_id")
@@ -38,10 +40,12 @@ public class Review {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_item_id")
+    @JsonIgnore
     private OrderItem orderItem;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_item_component_id")
+    @JsonIgnore
     private OrderItemComponent orderItemComponent;
 
     @Column(nullable = false)

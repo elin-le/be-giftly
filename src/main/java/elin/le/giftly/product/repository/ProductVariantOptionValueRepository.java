@@ -12,6 +12,7 @@ import java.util.UUID;
 @Repository
 public interface ProductVariantOptionValueRepository extends JpaRepository<ProductVariantOptionValue, UUID> {
     List<ProductVariantOptionValue> findByVariantId(UUID variantId);
+    List<ProductVariantOptionValue> findByOptionValueId(UUID optionValueId);
 
     @Query("SELECT pvo.optionValue.id FROM ProductVariantOptionValue pvo WHERE pvo.variant.id = :variantId")
     List<UUID> findOptionValueIdsByVariantId(@Param("variantId") UUID variantId);

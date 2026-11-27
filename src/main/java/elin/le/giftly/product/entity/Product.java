@@ -1,5 +1,6 @@
 package elin.le.giftly.product.entity;
 
+import elin.le.giftly.common.enums.CustomComponentType;
 import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.common.enums.ProductType;
 import jakarta.persistence.*;
@@ -37,6 +38,10 @@ public class Product {
     private ProductType productType;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "custom_component_type", length = 30)
+    private CustomComponentType customComponentType;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ProductStatus status;
 
@@ -68,4 +73,8 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ProductVariant> variants = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ProductImage> commonImages = new ArrayList<>();
 }

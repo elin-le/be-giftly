@@ -2,11 +2,14 @@ package elin.le.giftly.admin.controller;
 
 import elin.le.giftly.admin.dto.CreateProductRequest;
 import elin.le.giftly.admin.dto.UpdateProductRequest;
+import elin.le.giftly.admin.dto.UpdateVariantRequest;
 import elin.le.giftly.admin.service.AdminProductService;
 import elin.le.giftly.common.dto.ApiResponse;
+import elin.le.giftly.common.dto.PageResponse;
 import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.common.enums.ProductType;
 import elin.le.giftly.product.entity.Product;
+import elin.le.giftly.product.entity.ProductVariant;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -35,7 +38,7 @@ public class AdminProductController {
 
     @GetMapping
     @Operation(summary = "Get all products", description = "Retrieve all products with optional filtering by category, status, or type with pagination")
-    public ResponseEntity<ApiResponse<Page<Product>>> getAllProducts(
+    public ResponseEntity<ApiResponse<PageResponse<Product>>> getAllProducts(
             @Parameter(description = "Filter by category ID")
             @RequestParam(required = false) UUID categoryId,
             @Parameter(description = "Filter by product status")
@@ -56,7 +59,7 @@ public class AdminProductController {
             products = adminProductService.getAllProducts(pageable);
         }
 
-        return ResponseEntity.ok(ApiResponse.success(products));
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.from(products)));
     }
 
     @GetMapping("/{productId}")
@@ -95,5 +98,27 @@ public class AdminProductController {
             @PathVariable UUID productId) {
         adminProductService.deleteProduct(productId);
         return ResponseEntity.ok(ApiResponse.success("Product deleted successfully", null));
+    }
+
+    @DeleteMapping("/{productId}/variants/{variantId}")
+    @Operation(summary = "Delete variant", description = "Delete a variant from a product")
+    public ResponseEntity<ApiResponse<Void>> deleteVariant(
+            @Parameter(description = "Product ID", required = true)
+            @PathVariable UUID productId,
+            @Parameter(description = "Variant ID to delete", required = true)
+            @PathVariable UUID variantId) {
+        adminProductService.deleteVariant(productId, variantId);
+        return ResponseEntity.ok(ApiResponse.success("Variant deleted successfully", null));
+    }
+
+    @PutMapping("/variants/{variantId}")
+    @Operation(summary = "Update variant", description = "Update a specific variant's details")
+    public ResponseEntity<ApiResponse<ProductVariant>> updateVariant(
+            @Parameter(description = "Variant ID", required = true)
+            @PathVariable UUID variantId,
+            @Parameter(description = "Updated variant data", required = true)
+            @Valid @RequestBody UpdateVariantRequest request) {
+        ProductVariant variant = adminProductService.updateVariant(variantId, request);
+        return ResponseEntity.ok(ApiResponse.success("Variant updated successfully", variant));
     }
 }

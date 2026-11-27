@@ -57,7 +57,15 @@ public class BundleOptionService {
 
         elin.le.giftly.product.entity.ProductVariantPolicy policy = productVariantPolicyRepository.findByVariantId(variantId);
         if (policy == null) {
-            throw new ResourceNotFoundException("Product Variant Policy", "variantId", variantId);
+            // Return default policy when variant has no policy configured
+            return new ProductVariantPolicyResponse(
+                    null,
+                    variant.getId(),
+                    false,
+                    null,
+                    null,
+                    null
+            );
         }
 
         return new ProductVariantPolicyResponse(

@@ -28,9 +28,6 @@ public class GiftBoxConfig {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "box_variant_id", nullable = false)
-    private UUID boxVariantId;
-
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

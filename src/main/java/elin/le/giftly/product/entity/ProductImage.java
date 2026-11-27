@@ -1,5 +1,6 @@
 package elin.le.giftly.product.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -19,8 +20,14 @@ public class ProductImage {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_variant_id", nullable = false)
+    @JoinColumn(name = "product_variant_id")
+    @JsonIgnore
     private ProductVariant productVariant;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    @JsonIgnore
+    private Product product;
 
     @Column(name = "image_url", nullable = false)
     private String imageUrl;

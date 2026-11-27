@@ -5,6 +5,7 @@ import elin.le.giftly.admin.dto.UpdateUserStatusRequest;
 import elin.le.giftly.admin.service.AdminUserService;
 import elin.le.giftly.auth.entity.UserRole;
 import elin.le.giftly.common.dto.ApiResponse;
+import elin.le.giftly.common.dto.PageResponse;
 import elin.le.giftly.common.enums.UserStatus;
 import elin.le.giftly.user.entity.User;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,11 +36,11 @@ public class AdminUserController {
 
     @GetMapping
     @Operation(summary = "Get all users", description = "Retrieve all users with pagination")
-    public ResponseEntity<ApiResponse<Page<User>>> getAllUsers(
+    public ResponseEntity<ApiResponse<PageResponse<User>>> getAllUsers(
             @Parameter(description = "Pagination parameters")
             @PageableDefault(size = 20) Pageable pageable) {
         Page<User> users = adminUserService.getAllUsers(pageable);
-        return ResponseEntity.ok(ApiResponse.success(users));
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.from(users)));
     }
 
     @GetMapping("/{userId}")

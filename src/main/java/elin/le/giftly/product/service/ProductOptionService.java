@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -60,7 +61,8 @@ public class ProductOptionService {
         return new ProductOptionValueResponse(
                 value.getId(),
                 value.getValue(),
-                value.getColorHex()
+                value.getColorHex(),
+                value.getPriceAdjustment()
         );
     }
 
@@ -114,14 +116,34 @@ public class ProductOptionService {
                 )).collect(Collectors.toList())
                 : List.of();
 
+        // Calculate final price: base price + sum of option value price adjustments
+        BigDecimal finalPrice = calculateFinalPrice(variant);
+
         return new ProductResponse.VariantResponse(
                 variant.getId(),
                 variant.getSku(),
                 variant.getPrice(),
+                finalPrice,
                 variant.getStockQuantity(),
+                variant.getLength(),
+                variant.getWidth(),
+                variant.getHeight(),
+                variant.getDimensionUnit(),
+                variant.getWeight(),
+                variant.getWeightUnit(),
                 variant.getStatus() != null ? variant.getStatus().name() : null,
                 images,
                 optionValues
         );
+    }
+
+    private BigDecimal calculateFinalPrice(ProductVariant variant) {
+        if (variant.getOptionValues() == null || variant.getOptionValues().isEmpty()) {
+            return variant.getPrice();
+        }
+        BigDecimal adjustments = variant.getOptionValues().stream()
+                .map(pov -> pov.getOptionValue().getPriceAdjustment())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return variant.getPrice().add(adjustments);
     }
 }

@@ -2,6 +2,7 @@ package elin.le.giftly.admin.dto;
 
 import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.common.enums.ProductType;
+import elin.le.giftly.common.enums.CustomComponentType;
 import jakarta.validation.constraints.*;
 
 import java.util.List;
@@ -24,5 +25,22 @@ public record CreateProductRequest(
 
     Boolean isCustomBoxEligible,
 
-    List<CreateVariantRequest> variants
-) {}
+    List<VariantImageRequest> commonImages,
+
+    List<CreateVariantRequest> variants,
+
+    CustomComponentType customComponentType
+) {
+    public CreateProductRequest(
+            UUID categoryId,
+            String name,
+            String description,
+            ProductType productType,
+            ProductStatus status,
+            Boolean isCustomBoxEligible,
+            List<VariantImageRequest> commonImages,
+            List<CreateVariantRequest> variants
+    ) {
+        this(categoryId, name, description, productType, status, isCustomBoxEligible, commonImages, variants, null);
+    }
+}

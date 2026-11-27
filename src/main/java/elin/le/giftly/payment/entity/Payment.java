@@ -4,6 +4,7 @@ import elin.le.giftly.common.enums.PaymentMethod;
 import elin.le.giftly.common.enums.PaymentStage;
 import elin.le.giftly.common.enums.PaymentStatus;
 import elin.le.giftly.order.entity.Order;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -26,6 +27,7 @@ public class Payment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
+    @JsonIgnore
     private Order order;
 
     @Enumerated(EnumType.STRING)

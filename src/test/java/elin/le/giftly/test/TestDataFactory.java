@@ -234,6 +234,7 @@ public class TestDataFactory {
                 ProductType.REGULAR,
                 ProductStatus.AVAILABLE,
                 true,
+                null,
                 null
         );
     }

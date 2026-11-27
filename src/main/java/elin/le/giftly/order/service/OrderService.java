@@ -269,6 +269,7 @@ public class OrderService {
                 order.getSubtotal(),
                 order.getShippingFee(),
                 order.getTotalAmount(),
+                order.getRequiredAdvanceAmount(),
                 order.getStatus(),
                 order.getOrderedAt(),
                 addressResponse,

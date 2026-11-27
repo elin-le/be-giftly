@@ -135,7 +135,18 @@ fetch(url, { credentials: 'include' });
 | `PACKAGING_ACCESSORY` | Phụ kiện đóng gói (giấy, xốp...) |
 | `GREETING_CARD` | Thiệp chúc mừng |
 
-### 3.5. PaymentMethod
+### 3.5. CustomComponentType
+
+| Giá trị | Mô tả |
+|---|---|
+| `BOX` | Hộp chứa (được chọn riêng bằng `boxVariantId`) |
+| `WRAPPING` | Giấy gói |
+| `RIBBON` | Ruy-băng |
+| `FILLER` | Vật liệu chèn/lót |
+| `GREETING_CARD` | Thiệp |
+| `ACCESSORY` | Phụ kiện đóng gói khác |
+
+### 3.6. PaymentMethod
 
 | Giá trị | Mô tả |
 |---|---|
@@ -146,7 +157,7 @@ fetch(url, { credentials: 'include' });
 | `COD` | Thanh toán khi nhận hàng |
 | `ZALOPAY` | ZaloPay |
 
-### 3.6. PaymentStatus
+### 3.7. PaymentStatus
 
 | Giá trị | Mô tả |
 |---|---|
@@ -155,7 +166,7 @@ fetch(url, { credentials: 'include' });
 | `FAILED` | Thất bại |
 | `REFUNDED` | Đã hoàn tiền |
 
-### 3.7. PaymentStage
+### 3.8. PaymentStage
 
 | Giá trị | Mô tả |
 |---|---|
@@ -163,7 +174,7 @@ fetch(url, { credentials: 'include' });
 | `ADVANCE_PAYMENT` | Đặt cọc trước |
 | `REMAINING_PAYMENT` | Thanh toán số dư |
 
-### 3.8. VariantStatus
+### 3.9. VariantStatus
 
 | Giá trị | Mô tả |
 |---|---|
@@ -171,7 +182,7 @@ fetch(url, { credentials: 'include' });
 | `OUT_OF_STOCK` | Hết hàng |
 | `DISCONTINUED` | Ngừng kinh doanh |
 
-### 3.9. ReviewStatus
+### 3.10. ReviewStatus
 
 | Giá trị | Mô tả |
 |---|---|
@@ -179,14 +190,14 @@ fetch(url, { credentials: 'include' });
 | `APPROVED` | Đã duyệt |
 | `REJECTED` | Từ chối |
 
-### 3.10. ReturnPolicy
+### 3.11. ReturnPolicy
 
 | Giá trị | Mô tả |
 |---|---|
 | `RETURNABLE` | Có thể trả hàng |
 | `NO_RETURN` | Không trả hàng |
 
-### 3.11. GroupType
+### 3.12. GroupType
 
 | Giá trị | Mô tả |
 |---|---|
@@ -194,14 +205,14 @@ fetch(url, { credentials: 'include' });
 | `PACKAGING_ACCESSORY` | Nhóm chọn phụ kiện |
 | `OTHER` | Nhóm tùy chỉnh khác |
 
-### 3.12. SelectionType
+### 3.13. SelectionType
 
 | Giá trị | Mô tả |
 |---|---|
 | `SINGLE` | Chọn 1 |
 | `MULTIPLE` | Chọn nhiều |
 
-### 3.13. PricingMode
+### 3.14. PricingMode
 
 | Giá trị | Mô tả |
 |---|---|
@@ -209,7 +220,7 @@ fetch(url, { credentials: 'include' });
 | `PRODUCT_PRICE` | Giá theo sản phẩm |
 | `FIXED_PRICE` | Giá cố định |
 
-### 3.14. ComponentRole
+### 3.15. ComponentRole
 
 | Giá trị | Mô tả |
 |---|---|
@@ -218,14 +229,14 @@ fetch(url, { credentials: 'include' });
 | `ACCESSORY` | Phụ kiện |
 | `GREETING_CARD` | Thiệp |
 
-### 3.15. MessageRenderingMethod
+### 3.16. MessageRenderingMethod
 
 | Giá trị | Mô tả |
 |---|---|
 | `HANDWRITTEN` | Viết tay |
 | `PRINTED` | In |
 
-### 3.16. DimensionUnit
+### 3.17. DimensionUnit
 
 | Giá trị | Mô tả |
 |---|---|
@@ -233,7 +244,7 @@ fetch(url, { credentials: 'include' });
 | `CM` | Xentimét |
 | `M` | Mét |
 
-### 3.17. WeightUnit
+### 3.18. WeightUnit
 
 | Giá trị | Mô tả |
 |---|---|
@@ -418,9 +429,15 @@ GET /api/products
 | Tham số | Loại | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `categoryId` | UUID | Không | Lọc theo danh mục |
-| `keyword` | String | Không | Tìm kiếm tên/mô tả |
+| `keyword` | String | Không | Tìm tên/mô tả gần đúng, theo cụm hoặc từng từ; không phân biệt dấu tiếng Việt |
+| `type` | String | Không | `CUSTOM`, `REGULAR`/`RETAIL`, `SET`, `BOX` hoặc enum `ProductType` như `PACKAGING_ACCESSORY`, `GREETING_CARD` |
+| `customComponentType` | String | Không | Lọc lựa chọn custom theo `BOX`, `WRAPPING`, `RIBBON`, `FILLER`, `GREETING_CARD`, `ACCESSORY` |
+| `minPrice` | decimal | Không | Giá tối thiểu (bao gồm), tính theo giá của variant |
+| `maxPrice` | decimal | Không | Giá tối đa (bao gồm), tính theo giá của variant |
 | `cursor` | String | Không | Con trỏ phân trang |
 | `pageSize` | int | Không | Số lượng (mặc định 20) |
+
+Các bộ lọc được kết hợp đồng thời. `type=CUSTOM` chọn sản phẩm có `isCustomBoxEligible=true`; các bộ lọc giá chọn sản phẩm có ít nhất một variant nằm trong khoảng giá. Dùng `customComponentType=RIBBON` để lấy product variant dùng làm ruy-băng; response chứa `customComponentType` và ảnh của product/variant. Ví dụ: `/api/products?customComponentType=RIBBON`.
 
 **Response (200):**
 
@@ -435,6 +452,7 @@ GET /api/products
         "name": "Gấu bông Teddy 30cm",
         "description": "Gấu bông mềm mại...",
         "productType": "REGULAR",
+        "customComponentType": null,
         "status": "AVAILABLE",
         "isCustomBoxEligible": true,
         "category": {
@@ -482,6 +500,76 @@ GET /api/products
     "nextCursor": "uuid",
     "hasMore": true,
     "totalSize": 20
+  },
+  "timestamp": "2026-11-22T17:00:00"
+}
+```
+
+---
+
+#### 4.2.2. Lấy chi tiết sản phẩm
+
+```
+GET /api/products/{productId}
+```
+
+Lấy thông tin chi tiết của một sản phẩm bao gồm variants, ảnh chung, rating và số lượng đánh giá.
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Product retrieved successfully",
+  "data": {
+    "id": "uuid",
+    "name": "Gấu bông Teddy 30cm",
+    "description": "Gấu bông mềm mại...",
+    "productType": "REGULAR",
+    "customComponentType": null,
+    "status": "AVAILABLE",
+    "isCustomBoxEligible": true,
+    "category": {
+      "id": "uuid",
+      "name": "Gấu bông"
+    },
+    "images": [
+      {
+        "id": "uuid",
+        "imageUrl": "http://...",
+        "publicId": "...",
+        "secureUrl": "https://...",
+        "isPrimary": true,
+        "displayOrder": 0
+      }
+    ],
+    "variants": [
+      {
+        "id": "uuid",
+        "sku": "SM-RED",
+        "price": 50000,
+        "finalPrice": 55000,
+        "stockQuantity": 100,
+        "length": 30.0,
+        "width": 20.0,
+        "height": 15.0,
+        "dimensionUnit": "cm",
+        "weight": 0.5,
+        "weightUnit": "kg",
+        "status": "AVAILABLE",
+        "images": [ ... ],
+        "optionValues": [
+          {
+            "optionValueId": "uuid",
+            "optionName": "Màu sắc",
+            "value": "Đỏ",
+            "colorHex": "#FF0000"
+          }
+        ]
+      }
+    ],
+    "averageRating": 4.5,
+    "reviewCount": 10
   },
   "timestamp": "2026-11-22T17:00:00"
 }
@@ -549,6 +637,12 @@ Dùng để tìm biến thể (variant) tương ứng với các tùy chọn (m�
     "id": "uuid",
     "sku": "RED-M-001",
     "price": 99000,
+    "length": 30.0,
+    "width": 20.0,
+    "height": 15.0,
+    "dimensionUnit": "cm",
+    "weight": 0.5,
+    "weightUnit": "kg",
     "stockQuantity": 50,
     "status": "ACTIVE",
     "images": [
@@ -580,6 +674,136 @@ Dùng để tìm biến thể (variant) tương ứng với các tùy chọn (m�
 
 **Lỗi:**
 - `404` — Không tìm thấy variant khớp với các option value IDs đã cho
+
+---
+
+### 4.3.3. Admin Product Options (Cần auth, Admin)
+
+Quản lý các nhóm tùy chọn (màu sắc, kích cỡ) và giá trị của chúng cho sản phẩm.
+
+**Cơ chế tính giá:**
+- Mỗi variant có `price` (base price) — admin đặt khi tạo variant.
+- Mỗi option value có `priceAdjustment` (mặc định 0) — admin đặt mức tăng/giảm giá cho từng giá trị tùy chọn.
+- Giá cuối cùng (`finalPrice`) = base price + tổng priceAdjustment của các option values gắn với variant.
+- **Ví dụ:** Variant base price = 50000. Option value "Size L" có priceAdjustment = +5000. Option value "Màu đỏ" có priceAdjustment = +0. Final price = 50000 + 5000 + 0 = 55000.
+- **Lợi ích:** Xóa option value không ảnh hưởng đến variant — variant vẫn giữ base price. Admin chỉ cần set priceAdjustment cho option value để điều chỉnh giá.
+
+#### Tạo nhóm tùy chọn
+
+```
+POST /api/admin/products/{productId}/options
+Authorization: Bearer <token>
+```
+
+Tạo nhóm tùy chọn mới (ví dụ: "Màu sắc") với các giá trị đi kèm.
+
+**Request Body:**
+
+```json
+{
+  "name": "Màu sắc",
+  "displayOrder": 0,
+  "values": [
+    { "value": "Đỏ", "colorHex": "#FF0000", "priceAdjustment": 0 },
+    { "value": "Xanh", "colorHex": "#0000FF", "priceAdjustment": 0 },
+    { "value": "Vàng", "colorHex": "#FFFF00", "priceAdjustment": 5000 }
+  ]
+}
+```
+
+**Response (200):** Trả về `ProductOption` object với danh sách `ProductOptionValue` đã tạo.
+
+#### Cập nhật nhóm tùy chọn
+
+```
+PUT /api/admin/products/{productId}/options/{optionId}
+Authorization: Bearer <token>
+```
+
+Cập nhật tên, thứ tự hiển thị, và/hoặc thay thế toàn bộ giá trị của nhóm option. Nếu `values` được cung cấp, các giá trị cũ sẽ bị thay thế và các link variant-option của giá trị bị xóa sẽ được dọn dẹp.
+
+**Request Body:**
+
+```json
+{
+  "name": "Màu sắc",
+  "displayOrder": 1,
+  "values": [
+    { "value": "Đỏ", "colorHex": "#FF0000", "priceAdjustment": 0 },
+    { "value": "Xanh lá", "colorHex": "#00FF00", "priceAdjustment": 3000 },
+    { "value": "Vàng", "colorHex": "#FFFF00", "priceAdjustment": 5000 }
+  ]
+}
+```
+
+**Response (200):** Trả về `ProductOption` object đã cập nhật.
+
+#### Xóa nhóm tùy chọn
+
+```
+DELETE /api/admin/products/{productId}/options/{optionId}
+Authorization: Bearer <token>
+```
+
+Xóa nhóm tùy chọn và tất cả giá trị của nó. Các link variant-option của tất cả giá trị sẽ bị xóa.
+
+**Response (200):** `{"success": true, "message": "Option deleted successfully"}`
+
+#### Thêm giá trị vào nhóm tùy chọn
+
+```
+POST /api/admin/products/{productId}/options/{optionId}/values
+Authorization: Bearer <token>
+```
+
+Thêm giá trị mới (ví dụ: "Xanh lá") vào nhóm tùy chọn đã tồn tại.
+
+**Request Body:**
+
+```json
+{
+  "value": "Xanh lá",
+  "colorHex": "#00FF00",
+  "priceAdjustment": 3000
+}
+```
+
+**Response (200):** Trả về `ProductOptionValue` object đã tạo.
+
+**Lỗi:**
+- `400` — Giá trị đã tồn tại trong nhóm (trùng tên, không phân biệt hoa/thường)
+
+#### Cập nhật giá trị tùy chọn
+
+```
+PUT /api/admin/products/{productId}/options/{optionId}/values/{valueId}
+Authorization: Bearer <token>
+```
+
+Cập nhật tên và/hoặc mã màu HEX của một giá trị tùy chọn.
+
+**Request Body:**
+
+```json
+{
+  "value": "Đỏ tươi",
+  "colorHex": "#FF3333",
+  "priceAdjustment": 2000
+}
+```
+
+**Response (200):** Trả về `ProductOptionValue` object đã cập nhật.
+
+#### Xóa giá trị tùy chọn
+
+```
+DELETE /api/admin/products/{productId}/options/{optionId}/values/{valueId}
+Authorization: Bearer <token>
+```
+
+Xóa một giá trị tùy chọn khỏi nhóm. Các link variant-option của giá trị này sẽ bị xóa.
+
+**Response (200):** `{"success": true, "message": "Option value deleted successfully"}`
 
 ---
 
@@ -954,17 +1178,20 @@ PUT /api/orders/{orderId}/cancel
 
 ```
 POST /api/reviews
-Content-Type: multipart/form-data
+Content-Type: application/json
 ```
 
-**Form Data:**
+FE upload ảnh trực tiếp lên Cloudinary trước, sau đó gửi thông tin ảnh Cloudinary trong JSON. Backend không nhận file ảnh và không upload ảnh.
 
 | Field | Loại | Bắt buộc | Mô tả |
 |---|---|---|---|
-| `request` | JSON | Có | Dữ liệu đánh giá |
-| `image` | File | Không | Ảnh đánh giá (JPEG, PNG) |
+| `orderItemId` | UUID | Có | Dòng đơn hàng được đánh giá |
+| `rating` | Integer | Có | Điểm đánh giá từ 1 đến 5 |
+| `title` | String | Không | Tiêu đề đánh giá |
+| `comment` | String | Không | Nội dung đánh giá |
+| `images` | Array | Không | Tối đa 3 đối tượng, mỗi đối tượng gồm `publicId` và `secureUrl` từ Cloudinary |
 
-**`request` JSON:**
+**Request JSON:**
 
 ```json
 {
@@ -972,9 +1199,16 @@ Content-Type: multipart/form-data
   "rating": 5,
   "title": "Sản phẩm tuyệt vời!",
   "comment": "Chất lượng tốt, giao hàng nhanh.",
-  "imageUrl": "https://example.com/review-image.jpg"
+  "images": [
+    {
+      "publicId": "giftly/reviews/review-photo-1",
+      "secureUrl": "https://res.cloudinary.com/demo/image/upload/v1730000000/giftly/reviews/review-photo-1.jpg"
+    }
+  ]
 }
 ```
+
+`images` có thể bỏ qua hoặc là mảng rỗng. Gửi từ 1 đến tối đa 3 ảnh đã upload thành công; mỗi phần tử cần cả `publicId` và `secureUrl`.
 
 **Response (200):**
 
@@ -1005,21 +1239,13 @@ Content-Type: multipart/form-data
 
 ---
 
-#### 4.8.2. Lấy đánh giá theo sản phẩm
+#### 4.8.2. Lấy đánh giá theo sản phẩm (phân trang)
 
 ```
-GET /api/reviews/product/{productId}
+GET /api/reviews/product/{productId}?page=0&size=20&sort=createdAt,desc&rating=5
 ```
 
-**Response (200):** Trả về `List<ReviewResponse>`.
-
----
-
-#### 4.8.3. Lấy đánh giá theo sản phẩm (phân trang)
-
-```
-GET /api/reviews/product/{productId}/paginated
-```
+Endpoint danh sách review theo sản phẩm hiện hỗ trợ phân trang trực tiếp; không cần thêm hậu tố `/paginated`. Response có cấu trúc ổn định `ApiResponse<PageResponse<ReviewResponse>>`, vì vậy danh sách nằm trong `data.content`.
 
 **Query Parameters:**
 
@@ -1028,25 +1254,49 @@ GET /api/reviews/product/{productId}/paginated
 | `rating` | Short | Không | Lọc theo sao (1-5) |
 | `page` | int | Không | Trang (mặc định 0) |
 | `size` | int | Không | Số lượng (mặc định 20) |
-| `sort` | String | Không | Sắp xếp (mặc định createdAt) |
+| `sort` | String | Không | Sắp xếp (mặc định `createdAt,desc`; ví dụ `rating,desc`) |
 
-**Response (200):** Trả về `Page<ReviewResponse>`.
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Reviews retrieved successfully",
+  "data": {
+    "content": [{
+      "id": "uuid",
+      "rating": 5,
+      "title": "Sản phẩm tuyệt vời!",
+      "comment": "Chất lượng tốt, giao hàng nhanh.",
+      "imageUrls": [],
+      "createdAt": "2026-11-22T17:00:00"
+    }],
+    "page": 0,
+    "size": 20,
+    "totalElements": 42,
+    "totalPages": 3,
+    "first": true,
+    "last": false
+  },
+  "timestamp": "2026-11-22T17:00:00"
+}
+```
 
 ---
 
-#### 4.8.4. Lấy đánh giá của tôi
+#### 4.8.3. Lấy đánh giá của tôi
 
 ```
 GET /api/reviews/me
 ```
 
-**Query Parameters:** `page`, `size`, `sort` (mặc định createdAt).
+**Query Parameters:** `page`, `size`, `sort` (mặc định `createdAt,desc`).
 
-**Response (200):** Trả về `Page<ReviewResponse>`.
+**Response (200):** Trả về `ApiResponse<PageResponse<ReviewResponse>>`; danh sách review nằm trong `data.content`.
 
 ---
 
-#### 4.8.5. Lấy đánh giá theo ID
+#### 4.8.4. Lấy đánh giá theo ID
 
 ```
 GET /api/reviews/{reviewId}
@@ -1056,7 +1306,7 @@ GET /api/reviews/{reviewId}
 
 ---
 
-#### 4.8.6. Xóa đánh giá của tôi
+#### 4.8.5. Xóa đánh giá của tôi
 
 ```
 DELETE /api/reviews/{reviewId}
@@ -1354,6 +1604,10 @@ POST /api/gift-boxes
 ```json
 {
   "boxVariantId": "uuid",
+  "components": [
+    { "productVariantId": "ribbon-variant-uuid" },
+    { "productVariantId": "card-variant-uuid" }
+  ],
   "items": [
     {
       "productVariantId": "uuid",
@@ -1378,20 +1632,33 @@ POST /api/gift-boxes
     "boxProduct": {
       "variantId": "uuid",
       "name": "Hộp quà cao cấp",
-      "price": 20000
+      "sku": "BOX-L",
+      "price": 20000,
+      "images": [ { "secureUrl": "https://...", "isPrimary": true } ]
     },
+    "components": [
+      {
+        "variantId": "uuid",
+        "componentType": "RIBBON",
+        "name": "Ruy-băng lụa đỏ",
+        "sku": "RIBBON-RED",
+        "price": 5000,
+        "images": [ { "secureUrl": "https://...", "isPrimary": true } ]
+      }
+    ],
     "items": [
       {
         "id": "uuid",
         "variantId": "uuid",
-        "productName": "Gấu bông Teddy",
+        "name": "Gấu bông Teddy",
         "sku": "SM-RED",
         "price": 50000,
         "quantity": 1,
-        "subtotal": 50000
+        "subtotal": 50000,
+        "images": [ { "secureUrl": "https://...", "isPrimary": true } ]
       }
     ],
-    "totalPrice": 70000
+    "totalPrice": 75000
   },
   "timestamp": "2026-11-22T17:00:00"
 }
@@ -1435,6 +1702,10 @@ DELETE /api/gift-boxes/{id}
   "timestamp": "2026-11-22T17:00:00"
 }
 ```
+
+#### 4.12.5. Thêm/xóa thành phần custom
+
+`POST /api/gift-boxes/{giftBoxId}/components` nhận `{ "productVariantId": "uuid" }`; backend lấy `customComponentType` từ product và từ chối nếu cấu hình đã có thành phần cùng loại. `DELETE /api/gift-boxes/{giftBoxId}/components/{componentType}` xóa lựa chọn theo loại (không thể xóa `BOX`). Ảnh, SKU và giá được trả kèm trong `GiftBoxResponse`.
 
 ---
 
@@ -1516,6 +1787,7 @@ POST /api/admin/products
   "name": "Gấu bông Teddy 30cm",
   "description": "Gấu bông mềm mại, kích thước 30cm",
   "productType": "REGULAR",
+  "customComponentType": null,
   "status": "AVAILABLE",
   "isCustomBoxEligible": true,
   "variants": [
@@ -1561,6 +1833,8 @@ POST /api/admin/products
 
 **Bắt buộc trong variant:** `sku`, `price`, `stockQuantity`, `status`.
 
+`customComponentType` dùng để phân loại product có thể chọn trong hộp custom. `READY_MADE_GIFT_BOX` mặc định thành `BOX`, `GREETING_CARD` thành `GREETING_CARD`, còn `PACKAGING_ACCESSORY` mặc định thành `ACCESSORY`; hãy gửi rõ `WRAPPING`, `RIBBON` hoặc `FILLER` cho từng loại phụ kiện tương ứng.
+
 **Response (201):** Trả về `Product` entity đã lưu.
 
 ---
@@ -1579,6 +1853,7 @@ PUT /api/admin/products/{productId}
   "name": "Gấu bông Teddy 30cm - Updated",
   "description": "Mô tả mới",
   "productType": "REGULAR",
+  "customComponentType": null,
   "status": "AVAILABLE",
   "isCustomBoxEligible": true,
   "variants": [
@@ -1626,6 +1901,82 @@ DELETE /api/admin/products/{productId}
   "timestamp": "2026-11-22T17:00:00"
 }
 ```
+
+---
+
+**Xóa biến thể:**
+
+```
+DELETE /api/admin/products/{productId}/variants/{variantId}
+```
+
+Xóa một biến thể khỏi sản phẩm, đồng thời xóa các liên kết option values, policy, gift box detail và ảnh của variant đó.
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Variant deleted successfully",
+  "data": null,
+  "timestamp": "2026-11-22T17:00:00"
+}
+```
+
+---
+
+**Cập nhật biến thể:**
+
+```
+PUT /api/admin/variants/{variantId}
+```
+
+Cập nhật thông tin của một biến thể độc lập (SKU, giá, tồn kho, kích thước, trọng lượng, trạng thái, option values, ảnh, gift box detail, policy).
+
+**Request Body:**
+
+```json
+{
+  "sku": "NEW-SKU",
+  "price": 99000,
+  "stockQuantity": 50,
+  "length": 30.0,
+  "width": 20.0,
+  "height": 15.0,
+  "dimensionUnit": "cm",
+  "weight": 0.5,
+  "weightUnit": "kg",
+  "status": "AVAILABLE",
+  "optionValueIds": ["uuid", "uuid"],
+  "giftBoxDetail": {
+    "innerLength": 35.0,
+    "innerWidth": 25.0,
+    "innerHeight": 20.0,
+    "maxWeight": 1.0,
+    "dimensionUnit": "cm",
+    "weightUnit": "kg"
+  },
+  "variantPolicy": {
+    "isPerishable": false,
+    "shelfLifeHours": null,
+    "returnPolicy": "RETURNABLE",
+    "advancePaymentPercent": null
+  },
+  "images": [
+    {
+      "imageUrl": "https://...",
+      "secureUrl": "https://...",
+      "publicId": "abc123",
+      "isPrimary": true,
+      "displayOrder": 0
+    }
+  ]
+}
+```
+
+Tất cả field đều tùy chọn, chỉ cập nhật field được cung cấp.
+
+**Response (200):** Trả về `ProductVariant` entity đã cập nhật.
 
 ---
 
@@ -1982,6 +2333,233 @@ DELETE /api/admin/users/{userId}
   "timestamp": "2026-11-22T17:00:00"
 }
 ```
+
+---
+
+#### 4.13.6. Admin Bundle Options
+
+Quản lý bundle option groups và components cho gift box variants.
+
+**Tạo bundle option group:**
+
+```
+POST /api/admin/bundle/option-groups
+```
+
+**Request Body:**
+
+```json
+{
+  "bundleVariantId": "uuid",
+  "name": "Thiệp chúc mừng",
+  "groupType": "GREETING_CARD",
+  "selectionType": "SINGLE",
+  "minSelections": 1,
+  "maxSelections": 1,
+  "isRequired": true,
+  "displayOrder": 1,
+  "options": [
+    {
+      "productVariantId": "uuid",
+      "pricingMode": "FREE",
+      "fixedPrice": null
+    },
+    {
+      "productVariantId": "uuid",
+      "pricingMode": "FIXED_PRICE",
+      "fixedPrice": 15000
+    }
+  ]
+}
+```
+
+**Response (201):** Trả về `BundleOptionGroupResponse` với danh sách options.
+
+---
+
+**Cập nhật bundle option group:**
+
+```
+PUT /api/admin/bundle/option-groups/{groupId}
+```
+
+**Request Body:**
+
+```json
+{
+  "name": "Thiệp chúc mừng cao cấp",
+  "groupType": "GREETING_CARD",
+  "selectionType": "SINGLE",
+  "minSelections": 1,
+  "maxSelections": 1,
+  "isRequired": true,
+  "displayOrder": 1,
+  "options": [
+    {
+      "productVariantId": "uuid",
+      "pricingMode": "FREE",
+      "fixedPrice": null
+    }
+  ]
+}
+```
+
+**Response (200):** Trả về `BundleOptionGroupResponse` đã cập nhật.
+
+---
+
+**Xóa bundle option group:**
+
+```
+DELETE /api/admin/bundle/option-groups/{groupId}
+```
+
+**Response (200):** Xóa group và tất cả options thuộc nó (cascade).
+
+---
+
+**Xóa bundle option:**
+
+```
+DELETE /api/admin/bundle/options/{optionId}
+```
+
+**Response (200):** Xóa option khỏi group.
+
+---
+
+**Tạo bundle component:**
+
+```
+POST /api/admin/bundle/components
+```
+
+**Request Body:**
+
+```json
+{
+  "bundleVariantId": "uuid",
+  "componentVariantId": "uuid",
+  "componentRole": "BOX",
+  "quantity": 1,
+  "isRequired": true
+}
+```
+
+**Response (201):** Trả về `BundleComponentResponse`.
+
+Enum `ComponentRole`: `BOX`, `PRODUCT`, `ACCESSORY`, `GREETING_CARD`
+
+---
+
+**Xóa bundle component:**
+
+```
+DELETE /api/admin/bundle/components/{componentId}
+```
+
+**Response (200):** Xóa component khỏi bundle.
+
+---
+
+**Cập nhật bundle component:**
+
+```
+PUT /api/admin/bundle/components/{componentId}
+```
+
+**Request Body:**
+
+```json
+{
+  "role": "ACCESSORY",
+  "quantity": 2
+}
+```
+
+Tất cả field đều tùy chọn, chỉ cập nhật field được cung cấp.
+
+**Response (200):** Trả về `BundleComponentResponse` đã cập nhật.
+
+---
+
+**Liệt kê bundle option groups:**
+
+```
+GET /api/admin/bundle/option-groups
+```
+
+**Response (200):** Trả về danh sách tất cả bundle option groups.
+
+---
+
+**Liệt kê bundle option groups theo variant:**
+
+```
+GET /api/admin/bundle/variants/{variantId}/option-groups
+```
+
+**Response (200):** Trả về danh sách bundle option groups của variant chỉ định.
+
+---
+
+**Liệt kê bundle components:**
+
+```
+GET /api/admin/bundle/components
+```
+
+**Response (200):** Trả về danh sách tất cả bundle components.
+
+---
+
+**Liệt kê bundle components theo variant:**
+
+```
+GET /api/admin/bundle/variants/{variantId}/components
+```
+
+**Response (200):** Trả về danh sách bundle components của variant chỉ định.
+
+---
+
+#### 4.13.7. Ảnh chung sản phẩm (Common Images)
+
+Khi tạo hoặc cập nhật sản phẩm, FE có thể gửi danh sách ảnh chung (`commonImages`) ở level product, riêng biệt với ảnh của từng variant.
+
+**Tạo sản phẩm với ảnh chung:**
+
+```json
+{
+  "categoryId": "uuid",
+  "name": "Hộp quà Tết",
+  "description": "Hộp quà Tết cao cấp",
+  "productType": "READY_MADE_GIFT_BOX",
+  "customComponentType": "BOX",
+  "status": "AVAILABLE",
+  "isCustomBoxEligible": true,
+  "commonImages": [
+    {
+      "imageUrl": "https://example.com/product.jpg",
+      "secureUrl": "https://secure.example.com/product.jpg",
+      "publicId": "public-id-123",
+      "isPrimary": true,
+      "displayOrder": 0
+    }
+  ],
+  "variants": [...]
+}
+```
+
+**Cập nhật ảnh chung:**
+
+```
+PUT /api/admin/products/{productId}
+```
+
+Gửi trường `commonImages` trong request body để thay thế toàn bộ ảnh chung hiện tại.
+
+**Response:** `ProductResponse.images` sẽ trả về common images (nếu có), nếu không có thì fallback vào ảnh của variant đầu tiên.
 
 ---
 
