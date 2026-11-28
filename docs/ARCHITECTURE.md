@@ -24,7 +24,7 @@ Giftly follows a **layered architecture** with clear separation of concerns. Eac
 │  │                   Controller Layer                        │   │
 │  │  Auth │ Products │ Cart │ Orders │ Reviews │ GiftBox     │   │
 │  │  User │ Admin (Products, Categories, Orders, Users,      │   │
-│  │         Reviews, Dashboard)                               │   │
+│  │         Reviews, Gift Box Requests, Analytics)            │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                              │                                   │
 │  ┌───────────────────────────▼─────────────────────────────────┐│
@@ -69,7 +69,7 @@ Giftly follows a **layered architecture** with clear separation of concerns. Eac
 | **Cart** | `cart/` | Shopping cart operations (add, update, remove, clear) |
 | **Order** | `order/` | Order creation, history, cancellation |
 | **Review** | `review/` | Product reviews with Cloudinary image references |
-| **GiftBox** | `giftbox/` | Custom gift box creation and management |
+| **GiftBox** | `giftbox/` | Custom gift box creation, management, and direct purchase |
 | **Payment** | `payment/` | Payment entity and repository |
 
 ### Admin Modules
@@ -78,10 +78,11 @@ Giftly follows a **layered architecture** with clear separation of concerns. Eac
 |--------|---------|----------------|
 | **Admin Products** | `admin/` | Full CRUD for products with filtering |
 | **Admin Categories** | `admin/` | Full CRUD for categories |
+| **Admin Gift Box Requests** | `admin/` | Customer custom-box request review and management |
 | **Admin Orders** | `admin/` | Order management, status updates |
 | **Admin Users** | `admin/` | User management, role assignment |
 | **Admin Reviews** | `admin/` | Review moderation (approve/reject/delete) |
-| **Admin Dashboard** | `admin/` | Dashboard statistics and metrics |
+| **Admin Analytics** | `admin/` | Paid revenue, average order value and daily revenue metrics |
 
 ### Infrastructure Modules
 
@@ -113,7 +114,7 @@ Client → Request with Bearer token → JwtAuthenticationFilter
                                     ← Response wrapped in ApiResponse
 ```
 
-### 3. Order Creation Flow
+### 3. Cart Checkout Flow
 
 ```
 Client → POST /api/orders → OrderController → OrderService
@@ -126,7 +127,36 @@ Client → POST /api/orders → OrderController → OrderService
                                               ← OrderResponse
 ```
 
-### 4. Review Image Flow
+This flow checks out regular product variants from the cart. Custom gift boxes are not cart items.
+
+### 4. Custom Gift Box Draft Flow
+
+```
+Client → POST /api/gift-boxes { boxVariantId, components?, items }
+       ← GiftBoxResponse { id, ... }
+Client → PUT /api/gift-boxes/{id} { boxVariantId, components, items }
+       → Validate ownership, component uniqueness, eligibility, stock and capacity
+       → Replace draft selections transactionally
+       ← GiftBoxResponse with the same id
+Client → GET /api/gift-boxes or GET /api/gift-boxes/{id} after reload/login
+```
+
+Drafts are persisted per user in the database and survive logout; they are removed only by the explicit delete endpoint. Purchase-only minimum-content rules are checked at purchase time, while availability and physical constraints are checked when saving.
+
+### 5. Custom Gift Box Purchase Flow
+
+```
+Client → POST /api/gift-boxes/{giftBoxId}/purchase { addressId, quantity }
+       → GiftBoxController → OrderService
+                            → Verify configuration ownership and purchase constraints
+                            → Reserve box and component stock
+                            → Create order and component snapshots
+       ← OrderResponse
+```
+
+This authenticated flow creates an order directly from a saved custom gift box without modifying the cart. Cancelling the order restores stock for the box and its components.
+
+### 6. Review Image Flow
 
 ```
 Client → Upload image directly to Cloudinary

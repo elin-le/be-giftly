@@ -11,7 +11,7 @@ public record CreateGiftBoxRequest(
         UUID boxVariantId,
 
         @NotNull(message = "At least one item is required")
-        List<GiftBoxItemRequest> items,
+        List<@Valid GiftBoxItemRequest> items,
 
         List<@Valid GiftBoxComponentRequest> components
 ) {

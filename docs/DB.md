@@ -632,7 +632,7 @@ Một Order có thể có nhiều payment rows. `order.required_advance_amount` 
 | `paid_at` | TIMESTAMP | NULLABLE | Thời gian thanh toán |
 
 **PaymentMethod enum:**
-- `CREDIT_CARD`, `DEBIT_CARD`, `BANK_TRANSFER`, `E_WALLET`, `COD`
+- `COD`, `ZALOPAY` (V24 chuẩn hóa phương thức legacy khác về `COD` và thêm check constraint)
 
 **PaymentStatus enum:**
 - `PENDING`, `PAID`, `FAILED`, `REFUNDED`

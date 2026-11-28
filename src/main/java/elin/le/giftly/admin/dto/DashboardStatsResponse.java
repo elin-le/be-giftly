@@ -1,7 +1,6 @@
 package elin.le.giftly.admin.dto;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 public record DashboardStatsResponse(
     long totalProducts,
@@ -10,6 +9,8 @@ public record DashboardStatsResponse(
     long totalUsers,
     long totalReviews,
     BigDecimal totalRevenue,
+    BigDecimal averageOrderValue,
+    long paidOrderCount,
     long pendingOrders,
     long lowStockProducts
 ) {}

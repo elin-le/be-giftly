@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 @RequiredArgsConstructor
@@ -36,7 +37,18 @@ public class AdminDashboardService {
         // Low stock check moved to ProductVariant level
         long lowStockProducts = 0;
 
-        BigDecimal totalRevenue = BigDecimal.ZERO;
+        BigDecimal totalRevenue = paymentRepository.sumPaidAmount();
+        if (totalRevenue == null) {
+            totalRevenue = BigDecimal.ZERO;
+        }
+        long paidOrderCount = paymentRepository.countDistinctPaidOrders();
+        BigDecimal paidOrderTotals = orderRepository.sumPaidOrderTotals();
+        if (paidOrderTotals == null) {
+            paidOrderTotals = BigDecimal.ZERO;
+        }
+        BigDecimal averageOrderValue = paidOrderCount == 0
+                ? BigDecimal.ZERO
+                : paidOrderTotals.divide(BigDecimal.valueOf(paidOrderCount), 2, RoundingMode.HALF_UP);
 
         return new DashboardStatsResponse(
             totalProducts,
@@ -45,6 +57,8 @@ public class AdminDashboardService {
             totalUsers,
             totalReviews,
             totalRevenue,
+            averageOrderValue,
+            paidOrderCount,
             pendingOrders,
             lowStockProducts
         );

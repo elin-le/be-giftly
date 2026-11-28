@@ -9,6 +9,8 @@ import elin.le.giftly.giftbox.dto.CreateGiftBoxRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxComponentRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxItemRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxResponse;
+import elin.le.giftly.giftbox.dto.SaveGiftBoxItemsRequest;
+import elin.le.giftly.giftbox.dto.UpdateGiftBoxRequest;
 import elin.le.giftly.giftbox.entity.GiftBoxConfig;
 import elin.le.giftly.giftbox.entity.GiftBoxConfigItem;
 import elin.le.giftly.giftbox.repository.GiftBoxConfigItemRepository;
@@ -55,6 +57,8 @@ class GiftBoxServiceComponentTest {
     private ProductVariantRepository productVariantRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private GiftBoxPurchaseValidator giftBoxPurchaseValidator;
     @InjectMocks
     private GiftBoxService giftBoxService;
 
@@ -87,7 +91,8 @@ class GiftBoxServiceComponentTest {
                     items.forEach(savedItems::add);
                     return savedItems;
                 });
-        lenient().when(giftBoxConfigItemRepository.findByConfigId(configId)).thenAnswer(invocation -> savedItems);
+        lenient().when(giftBoxConfigItemRepository.findByConfigId(configId))
+                .thenAnswer(invocation -> new ArrayList<>(savedItems));
     }
 
     @AfterEach
@@ -159,6 +164,112 @@ class GiftBoxServiceComponentTest {
         assertThrows(BadRequestException.class, () -> giftBoxService.removeGiftBoxItem(configId, itemId));
 
         verify(giftBoxConfigItemRepository, never()).delete(boxItem);
+    }
+
+    @Test
+    void savesACompleteItemSelectionAndPreservesTheBoxAndComponents() {
+        ProductVariant box = variant(boxVariantId, ProductType.READY_MADE_GIFT_BOX,
+                CustomComponentType.BOX, "Gift box", "BOX-01", "20.00", false);
+        ProductVariant ribbon = variant(ribbonVariantId, ProductType.PACKAGING_ACCESSORY,
+                CustomComponentType.RIBBON, "Silk ribbon", "RIBBON-01", "5.00", false);
+        ProductVariant content = variant(contentVariantId, ProductType.REGULAR,
+                null, "Teddy bear", "TEDDY-01", "50.00", false);
+        GiftBoxConfig config = GiftBoxConfig.builder().id(configId).userId(userId).build();
+        GiftBoxConfigItem boxItem = configItem(config, box.getId(), CustomComponentType.BOX, 1);
+        GiftBoxConfigItem ribbonItem = configItem(config, ribbon.getId(), CustomComponentType.RIBBON, 1);
+        GiftBoxConfigItem oldContent = configItem(config, content.getId(), null, 1);
+        savedItems.addAll(List.of(boxItem, ribbonItem, oldContent));
+        config.getItems().addAll(savedItems);
+        when(giftBoxConfigRepository.findById(configId)).thenReturn(Optional.of(config));
+        doAnswer(invocation -> {
+            Iterable<GiftBoxConfigItem> toDelete = invocation.getArgument(0);
+            toDelete.forEach(savedItems::remove);
+            return null;
+        }).when(giftBoxConfigItemRepository).deleteAll(ArgumentMatchers.<Iterable<GiftBoxConfigItem>>any());
+
+        GiftBoxResponse response = giftBoxService.saveGiftBoxItems(configId,
+                new SaveGiftBoxItemsRequest(List.of(new GiftBoxItemRequest(contentVariantId, 2))));
+
+        assertEquals(1, response.items().size());
+        assertEquals(2, response.items().get(0).quantity());
+        assertEquals(1, response.components().size());
+        assertEquals(new BigDecimal("125.00"), response.totalPrice());
+        verify(giftBoxPurchaseValidator).validateForSave(configId, userId);
+    }
+
+    @Test
+    void replacesTheEntireDraftWithoutChangingItsId() {
+        UUID replacementBoxId = UUID.randomUUID();
+        UUID cardVariantId = UUID.randomUUID();
+        ProductVariant oldBox = variant(boxVariantId, ProductType.READY_MADE_GIFT_BOX,
+                CustomComponentType.BOX, "Old gift box", "BOX-OLD", "20.00", false);
+        ProductVariant oldRibbon = variant(ribbonVariantId, ProductType.PACKAGING_ACCESSORY,
+                CustomComponentType.RIBBON, "Old ribbon", "RIBBON-OLD", "5.00", false);
+        ProductVariant replacementBox = variant(replacementBoxId, ProductType.READY_MADE_GIFT_BOX,
+                CustomComponentType.BOX, "New gift box", "BOX-NEW", "30.00", false);
+        ProductVariant card = variant(cardVariantId, ProductType.GREETING_CARD,
+                CustomComponentType.GREETING_CARD, "Greeting card", "CARD-01", "7.00", false);
+        ProductVariant content = variant(contentVariantId, ProductType.REGULAR,
+                null, "Teddy bear", "TEDDY-01", "50.00", false);
+        GiftBoxConfig config = GiftBoxConfig.builder().id(configId).userId(userId).build();
+        GiftBoxConfigItem oldBoxItem = configItem(config, oldBox.getId(), CustomComponentType.BOX, 1);
+        GiftBoxConfigItem oldRibbonItem = configItem(config, oldRibbon.getId(), CustomComponentType.RIBBON, 1);
+        GiftBoxConfigItem oldContent = configItem(config, content.getId(), null, 1);
+        savedItems.addAll(List.of(oldBoxItem, oldRibbonItem, oldContent));
+        config.getItems().addAll(savedItems);
+        when(giftBoxConfigRepository.findById(configId)).thenReturn(Optional.of(config));
+        doAnswer(invocation -> {
+            Iterable<GiftBoxConfigItem> toDelete = invocation.getArgument(0);
+            toDelete.forEach(savedItems::remove);
+            return null;
+        }).when(giftBoxConfigItemRepository).deleteAll(ArgumentMatchers.<Iterable<GiftBoxConfigItem>>any());
+
+        GiftBoxResponse response = giftBoxService.updateGiftBox(configId, new UpdateGiftBoxRequest(
+                replacementBoxId,
+                List.of(new GiftBoxComponentRequest(cardVariantId)),
+                List.of(new GiftBoxItemRequest(contentVariantId, 2))));
+
+        assertEquals(configId, response.id());
+        assertEquals("BOX-NEW", response.boxProduct().sku());
+        assertEquals(1, response.components().size());
+        assertEquals("GREETING_CARD", response.components().get(0).componentType());
+        assertEquals(1, response.items().size());
+        assertEquals(2, response.items().get(0).quantity());
+        assertEquals(new BigDecimal("137.00"), response.totalPrice());
+        verify(giftBoxConfigItemRepository).flush();
+        verify(giftBoxPurchaseValidator).validateForSave(configId, userId);
+    }
+
+    @Test
+    void rejectsDuplicateComponentsBeforeReplacingTheSavedDraft() {
+        UUID secondRibbonId = UUID.randomUUID();
+        variant(boxVariantId, ProductType.READY_MADE_GIFT_BOX,
+                CustomComponentType.BOX, "Gift box", "BOX-01", "20.00", false);
+        variant(ribbonVariantId, ProductType.PACKAGING_ACCESSORY,
+                CustomComponentType.RIBBON, "Silk ribbon", "RIBBON-01", "5.00", false);
+        variant(secondRibbonId, ProductType.PACKAGING_ACCESSORY,
+                CustomComponentType.RIBBON, "Satin ribbon", "RIBBON-02", "7.00", false);
+        GiftBoxConfig config = GiftBoxConfig.builder().id(configId).userId(userId).build();
+        when(giftBoxConfigRepository.findById(configId)).thenReturn(Optional.of(config));
+
+        assertThrows(BadRequestException.class, () -> giftBoxService.updateGiftBox(configId,
+                new UpdateGiftBoxRequest(boxVariantId,
+                        List.of(new GiftBoxComponentRequest(ribbonVariantId),
+                                new GiftBoxComponentRequest(secondRibbonId)),
+                        List.of())));
+
+        verify(giftBoxConfigItemRepository, never()).deleteAll(ArgumentMatchers.<Iterable<GiftBoxConfigItem>>any());
+        verify(giftBoxConfigItemRepository, never()).saveAll(ArgumentMatchers.<Iterable<GiftBoxConfigItem>>any());
+    }
+
+    private GiftBoxConfigItem configItem(
+            GiftBoxConfig config, UUID variantId, CustomComponentType componentType, int quantity) {
+        return GiftBoxConfigItem.builder()
+                .config(config)
+                .productVariantId(variantId)
+                .componentType(componentType)
+                .quantity(quantity)
+                .build();
     }
 
     private ProductVariant variant(

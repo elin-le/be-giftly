@@ -1,0 +1,1 @@
+ALTER TABLE gift_box_config ALTER COLUMN box_product_id DROP NOT NULL;

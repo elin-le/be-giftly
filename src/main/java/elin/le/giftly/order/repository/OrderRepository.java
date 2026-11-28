@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,39 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Page<Order> findByUserId(UUID userId, Pageable pageable);
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
     Page<Order> findByUserIdAndStatus(UUID userId, OrderStatus status, Pageable pageable);
+
+    long countByOrderedAtGreaterThanEqualAndOrderedAtLessThan(LocalDateTime from, LocalDateTime to);
+
+    @Query("""
+            SELECT COUNT(DISTINCT o.userId) FROM Order o
+            WHERE o.orderedAt >= :from AND o.orderedAt < :to
+            """)
+    long countDistinctCustomersBetween(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
+
+    @Query("""
+            SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o
+            WHERE EXISTS (
+                SELECT p.id FROM Payment p
+                WHERE p.order.id = o.id
+                  AND p.paymentStatus = elin.le.giftly.common.enums.PaymentStatus.PAID
+                  AND p.paidAt >= :from AND p.paidAt < :to
+            )
+            """)
+    BigDecimal sumPaidOrderTotalsBetween(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
+
+    @Query("""
+            SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o
+            WHERE EXISTS (
+                SELECT p.id FROM Payment p
+                WHERE p.order.id = o.id
+                  AND p.paymentStatus = elin.le.giftly.common.enums.PaymentStatus.PAID
+            )
+            """)
+    BigDecimal sumPaidOrderTotals();
 
     List<Order> findTopByUserId(UUID userId, org.springframework.data.domain.Pageable pageable);
 

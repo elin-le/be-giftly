@@ -1,6 +1,9 @@
 package elin.le.giftly.giftbox.repository;
 
 import elin.le.giftly.giftbox.entity.GiftBoxConfig;
+import elin.le.giftly.common.enums.GiftBoxReviewStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,4 +13,5 @@ import java.util.UUID;
 @Repository
 public interface GiftBoxConfigRepository extends JpaRepository<GiftBoxConfig, UUID> {
     List<GiftBoxConfig> findByUserId(UUID userId);
+    Page<GiftBoxConfig> findByReviewStatus(GiftBoxReviewStatus reviewStatus, Pageable pageable);
 }

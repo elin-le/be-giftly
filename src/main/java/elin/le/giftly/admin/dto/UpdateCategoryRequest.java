@@ -1,8 +1,14 @@
 package elin.le.giftly.admin.dto;
 
-import java.util.UUID;
+import jakarta.validation.Valid;
 
 public record UpdateCategoryRequest(
     String name,
-    String description
-) {}
+    String description,
+    @Valid ImageInfo image,
+    boolean removeImage
+) {
+    public UpdateCategoryRequest(String name, String description) {
+        this(name, description, null, false);
+    }
+}

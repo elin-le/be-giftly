@@ -6,6 +6,8 @@ import elin.le.giftly.giftbox.dto.GiftBoxItemRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxComponentRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxResponse;
 import elin.le.giftly.giftbox.dto.PurchaseGiftBoxRequest;
+import elin.le.giftly.giftbox.dto.SaveGiftBoxItemsRequest;
+import elin.le.giftly.giftbox.dto.UpdateGiftBoxRequest;
 import elin.le.giftly.giftbox.service.GiftBoxService;
 import elin.le.giftly.order.dto.OrderResponse;
 import elin.le.giftly.order.service.OrderService;
@@ -40,12 +42,22 @@ public class GiftBoxController {
     }
 
     @PostMapping
-    @Operation(summary = "Create gift box", description = "Create a new custom gift box with selected products")
+    @Operation(summary = "Create custom gift box draft", description = "Create and persist a custom gift box draft starting with a selected box variant")
     public ResponseEntity<ApiResponse<GiftBoxResponse>> createGiftBox(
-            @Parameter(description = "Gift box data with name, description, and items", required = true)
+            @Parameter(description = "Gift box selection with box variant, components, and content items", required = true)
             @Valid @RequestBody CreateGiftBoxRequest request) {
         GiftBoxResponse giftBox = giftBoxService.createGiftBox(request);
         return ResponseEntity.ok(ApiResponse.success("Gift box created successfully", giftBox));
+    }
+
+    @PutMapping("/{giftBoxId}")
+    @Operation(summary = "Update custom gift box draft", description = "Replace the box, selected components, and content items without changing the saved draft ID")
+    public ResponseEntity<ApiResponse<GiftBoxResponse>> updateGiftBox(
+            @Parameter(description = "Saved custom gift box ID", required = true)
+            @PathVariable UUID giftBoxId,
+            @Valid @RequestBody UpdateGiftBoxRequest request) {
+        GiftBoxResponse giftBox = giftBoxService.updateGiftBox(giftBoxId, request);
+        return ResponseEntity.ok(ApiResponse.success("Gift box draft updated successfully", giftBox));
     }
 
     @GetMapping
@@ -82,6 +94,16 @@ public class GiftBoxController {
             @Valid @RequestBody GiftBoxItemRequest request) {
         GiftBoxResponse giftBox = giftBoxService.addGiftBoxItem(giftBoxId, request);
         return ResponseEntity.ok(ApiResponse.success("Item added to gift box", giftBox));
+    }
+
+    @PutMapping("/{giftBoxId}/items")
+    @Operation(summary = "Save gift box items", description = "Replace the selected content items while preserving the box and selected components")
+    public ResponseEntity<ApiResponse<GiftBoxResponse>> saveGiftBoxItems(
+            @Parameter(description = "Gift box ID", required = true)
+            @PathVariable UUID giftBoxId,
+            @Valid @RequestBody SaveGiftBoxItemsRequest request) {
+        GiftBoxResponse giftBox = giftBoxService.saveGiftBoxItems(giftBoxId, request);
+        return ResponseEntity.ok(ApiResponse.success("Gift box items saved successfully", giftBox));
     }
 
     @PostMapping("/{giftBoxId}/components")

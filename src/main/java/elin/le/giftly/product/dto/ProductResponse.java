@@ -20,9 +20,12 @@ public record ProductResponse(
 ) {
     public record CategoryResponse(
             UUID id,
-            String name
+            String name,
+            CategoryImageResponse image
     ) {
     }
+
+    public record CategoryImageResponse(String publicId, String secureUrl) {}
 
     public record ImageResponse(
             UUID id,

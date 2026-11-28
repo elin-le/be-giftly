@@ -30,7 +30,13 @@ public interface ProductMapper {
                 ? product.getCustomComponentType().name() : null;
         String status = product.getStatus() != null ? product.getStatus().name() : null;
         ProductResponse.CategoryResponse category = product.getCategory() != null
-                ? new ProductResponse.CategoryResponse(product.getCategory().getId(), product.getCategory().getName())
+                ? new ProductResponse.CategoryResponse(
+                        product.getCategory().getId(),
+                        product.getCategory().getName(),
+                        product.getCategory().getImagePublicId() == null ? null
+                                : new ProductResponse.CategoryImageResponse(
+                                        product.getCategory().getImagePublicId(),
+                                        product.getCategory().getImageSecureUrl()))
                 : null;
         // Common images: use product-level images first, fall back to first variant's images
         List<ProductResponse.ImageResponse> images = product.getCommonImages() != null && !product.getCommonImages().isEmpty()

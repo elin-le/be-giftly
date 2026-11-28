@@ -27,7 +27,10 @@ public class CategoryController {
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
         List<Category> categories = categoryRepository.findAll();
         List<CategoryResponse> response = categories.stream()
-                .map(cat -> new CategoryResponse(cat.getId(), cat.getName(), cat.getDescription()))
+                .map(cat -> new CategoryResponse(
+                        cat.getId(), cat.getName(), cat.getDescription(),
+                        cat.getImagePublicId() == null ? null
+                                : new CategoryResponse.ImageResponse(cat.getImagePublicId(), cat.getImageSecureUrl())))
                 .toList();
         return ResponseEntity.ok(ApiResponse.success("Categories retrieved successfully", response));
     }

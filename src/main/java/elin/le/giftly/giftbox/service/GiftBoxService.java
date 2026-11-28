@@ -7,7 +7,10 @@ import elin.le.giftly.exception.model.BadRequestException;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.giftbox.dto.CreateGiftBoxRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxComponentRequest;
+import elin.le.giftly.giftbox.dto.GiftBoxItemRequest;
 import elin.le.giftly.giftbox.dto.GiftBoxResponse;
+import elin.le.giftly.giftbox.dto.SaveGiftBoxItemsRequest;
+import elin.le.giftly.giftbox.dto.UpdateGiftBoxRequest;
 import elin.le.giftly.giftbox.entity.GiftBoxConfig;
 import elin.le.giftly.giftbox.entity.GiftBoxConfigItem;
 import elin.le.giftly.giftbox.repository.GiftBoxConfigRepository;
@@ -41,82 +44,49 @@ public class GiftBoxService {
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
+    private final GiftBoxPurchaseValidator giftBoxPurchaseValidator;
 
     @Transactional
     public GiftBoxResponse createGiftBox(CreateGiftBoxRequest request) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         UUID userId = getCurrentUserId(email);
+        return createGiftBoxForUser(userId, request);
+    }
 
-        // Validate box variant (must be READY_MADE_GIFT_BOX)
-        ProductVariant boxVariant = getVariantAndValidateType(request.boxVariantId(), ProductType.READY_MADE_GIFT_BOX);
-
-        // Create gift box config
+    @Transactional
+    public GiftBoxResponse createGiftBoxForUser(UUID userId, CreateGiftBoxRequest request) {
         GiftBoxConfig config = GiftBoxConfig.builder()
                 .userId(userId)
                 .build();
-
         config = giftBoxConfigRepository.save(config);
+        replaceGiftBoxSelections(config, request.boxVariantId(),
+                request.components() == null ? List.of() : request.components(), request.items());
+        return toGiftBoxResponse(config);
+    }
 
-        List<GiftBoxConfigItem> items = new ArrayList<>();
-        items.add(GiftBoxConfigItem.builder()
-                .config(config)
-                .productVariantId(boxVariant.getId())
-                .componentType(CustomComponentType.BOX)
-                .quantity(1)
-                .build());
+    @Transactional
+    public GiftBoxResponse updateGiftBoxForAdmin(UUID giftBoxId, UpdateGiftBoxRequest request) {
+        GiftBoxConfig config = giftBoxConfigRepository.findById(giftBoxId)
+                .orElseThrow(() -> new ResourceNotFoundException("GiftBox", "id", giftBoxId));
+        replaceGiftBoxSelections(config, request.boxVariantId(), request.components(), request.items());
+        config.setReviewStatus(elin.le.giftly.common.enums.GiftBoxReviewStatus.PENDING);
+        config.setReviewNote(null);
+        giftBoxPurchaseValidator.validateForSave(giftBoxId, config.getUserId());
+        return toGiftBoxResponse(config);
+    }
 
-        Set<CustomComponentType> selectedComponentTypes = new HashSet<>();
-        if (request.components() != null) {
-            for (GiftBoxComponentRequest componentRequest : request.components()) {
-                ProductVariant variant = productVariantRepository.findById(componentRequest.productVariantId())
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Product Variant", "id", componentRequest.productVariantId()));
-                CustomComponentType componentType = validateCustomComponent(variant);
-                if (!selectedComponentTypes.add(componentType)) {
-                    throw new BadRequestException("Only one component can be selected for type: " + componentType);
-                }
-                items.add(GiftBoxConfigItem.builder()
-                        .config(config)
-                        .productVariantId(variant.getId())
-                        .componentType(componentType)
-                        .quantity(1)
-                        .build());
-            }
-        }
+    @Transactional(readOnly = true)
+    public GiftBoxResponse getGiftBoxResponseForAdmin(UUID giftBoxId) {
+        GiftBoxConfig config = giftBoxConfigRepository.findById(giftBoxId)
+                .orElseThrow(() -> new ResourceNotFoundException("GiftBox", "id", giftBoxId));
+        return toGiftBoxResponse(config);
+    }
 
-        // Create gift box contents
-        for (var itemRequest : request.items()) {
-            ProductVariant variant = productVariantRepository.findById(itemRequest.productVariantId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product Variant", "id", itemRequest.productVariantId()));
-            if (variant.getProduct().getCustomComponentType() != null) {
-                throw new BadRequestException("Custom components must be selected through the components field");
-            }
-
-            // Validate: no READY_MADE_GIFT_SET in custom box
-            if (variant.getProduct().getProductType() == ProductType.READY_MADE_GIFT_SET) {
-                throw new BadRequestException("Ready-made gift sets cannot be added to a custom box");
-            }
-
-            // Validate: REGULAR products must be custom box eligible
-            if (variant.getProduct().getProductType() == ProductType.REGULAR
-                    && Boolean.FALSE.equals(variant.getProduct().getIsCustomBoxEligible())) {
-                throw new BadRequestException("Product is not eligible for custom box: " + variant.getProduct().getName());
-            }
-
-            if (variant.getStatus() != VariantStatus.AVAILABLE) {
-                throw new BadRequestException("Product variant is not available: " + variant.getSku());
-            }
-
-            GiftBoxConfigItem item = GiftBoxConfigItem.builder()
-                    .config(config)
-                    .productVariantId(variant.getId())
-                    .quantity(itemRequest.quantity())
-                    .build();
-            items.add(item);
-        }
-        giftBoxConfigItemRepository.saveAll(items);
-        config.getItems().addAll(items);
-
+    @Transactional
+    public GiftBoxResponse updateGiftBox(UUID giftBoxId, UpdateGiftBoxRequest request) {
+        UUID userId = getCurrentUserId(SecurityContextHolder.getContext().getAuthentication().getName());
+        GiftBoxConfig config = getOwnedConfig(giftBoxId, userId);
+        replaceGiftBoxSelections(config, request.boxVariantId(), request.components(), request.items());
         return toGiftBoxResponse(config);
     }
 
@@ -202,8 +172,86 @@ public class GiftBoxService {
                 .build();
         giftBoxConfigItemRepository.save(item);
         config.getItems().add(item);
+        giftBoxPurchaseValidator.validateForSave(giftBoxId, userId);
 
         return toGiftBoxResponse(config);
+    }
+
+    @Transactional
+    public GiftBoxResponse saveGiftBoxItems(UUID giftBoxId, SaveGiftBoxItemsRequest request) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        UUID userId = getCurrentUserId(email);
+        GiftBoxConfig config = getOwnedConfig(giftBoxId, userId);
+
+        List<GiftBoxConfigItem> existingItems = giftBoxConfigItemRepository.findByConfigId(giftBoxId);
+        List<GiftBoxConfigItem> contentItems = existingItems.stream()
+                .filter(item -> item.getComponentType() == null)
+                .toList();
+        giftBoxConfigItemRepository.deleteAll(contentItems);
+        config.getItems().removeAll(contentItems);
+
+        List<GiftBoxConfigItem> items = request.items().stream()
+                .map(itemRequest -> toConfigItem(config, itemRequest))
+                .toList();
+        giftBoxConfigItemRepository.saveAll(items);
+        config.getItems().addAll(items);
+
+        giftBoxPurchaseValidator.validateForSave(giftBoxId, userId);
+        return toGiftBoxResponse(config);
+    }
+
+    private GiftBoxConfigItem toConfigItem(GiftBoxConfig config, GiftBoxItemRequest request) {
+        return GiftBoxConfigItem.builder()
+                .config(config)
+                .productVariantId(request.productVariantId())
+                .quantity(request.quantity())
+                .build();
+    }
+
+    private void replaceGiftBoxSelections(
+            GiftBoxConfig config,
+            UUID boxVariantId,
+            List<GiftBoxComponentRequest> componentRequests,
+            List<GiftBoxItemRequest> itemRequests) {
+        ProductVariant boxVariant = getVariantAndValidateType(boxVariantId, ProductType.READY_MADE_GIFT_BOX);
+        List<GiftBoxConfigItem> replacementItems = new ArrayList<>();
+        replacementItems.add(GiftBoxConfigItem.builder()
+                .config(config)
+                .productVariantId(boxVariant.getId())
+                .componentType(CustomComponentType.BOX)
+                .quantity(1)
+                .build());
+
+        Set<CustomComponentType> selectedComponentTypes = new HashSet<>();
+        for (GiftBoxComponentRequest componentRequest : componentRequests) {
+            ProductVariant variant = productVariantRepository.findById(componentRequest.productVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Product Variant", "id", componentRequest.productVariantId()));
+            CustomComponentType componentType = validateCustomComponent(variant);
+            if (!selectedComponentTypes.add(componentType)) {
+                throw new BadRequestException("Only one component can be selected for type: " + componentType);
+            }
+            replacementItems.add(GiftBoxConfigItem.builder()
+                    .config(config)
+                    .productVariantId(variant.getId())
+                    .componentType(componentType)
+                    .quantity(1)
+                    .build());
+        }
+
+        replacementItems.addAll(itemRequests.stream()
+                .map(itemRequest -> toConfigItem(config, itemRequest))
+                .toList());
+
+        List<GiftBoxConfigItem> existingItems = giftBoxConfigItemRepository.findByConfigId(config.getId());
+        if (!existingItems.isEmpty()) {
+            giftBoxConfigItemRepository.deleteAll(existingItems);
+            config.getItems().removeAll(existingItems);
+            giftBoxConfigItemRepository.flush();
+        }
+        giftBoxConfigItemRepository.saveAll(replacementItems);
+        config.getItems().addAll(replacementItems);
+        giftBoxPurchaseValidator.validateForSave(config.getId(), config.getUserId());
     }
 
     @Transactional
@@ -228,6 +276,7 @@ public class GiftBoxService {
                 .build();
         giftBoxConfigItemRepository.save(component);
         config.getItems().add(component);
+        giftBoxPurchaseValidator.validateForSave(giftBoxId, userId);
         return toGiftBoxResponse(config);
     }
 

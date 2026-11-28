@@ -92,6 +92,17 @@ class GiftBoxPurchaseValidatorTest {
     }
 
     @Test
+    void allowsSavingAnIncompleteDraftBeforeThePurchaseMinimumIsReached() {
+        setItems(List.of(
+                item(boxId, 1, CustomComponentType.BOX),
+                item(firstContentId, 1, null)));
+
+        GiftBoxPurchaseValidator.ValidatedGiftBox validated = validator.validateForSave(configId, userId);
+
+        assertEquals(2, validated.items().size());
+    }
+
+    @Test
     void rejectsWhenRequestedBoxQuantityExceedsAnyComponentStock() {
         variants.get(thirdContentId).setStockQuantity(1);
         setItems(validItemsWithCard());

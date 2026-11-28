@@ -871,12 +871,9 @@ INSERT INTO payment (id, order_id, payment_method, payment_status, amount, paid_
 SELECT md5('giftly-demo-payment:' || lpad(o.order_no::text,
                                           GREATEST(3, length(o.order_no::text)), '0'))::uuid,
        o.order_id,
-       CASE o.order_no % 5
+       CASE o.order_no % 2
            WHEN 0 THEN 'COD'
-           WHEN 1 THEN 'E_WALLET'
-           WHEN 2 THEN 'BANK_TRANSFER'
-           WHEN 3 THEN 'ZALOPAY'
-           ELSE 'CREDIT_CARD'
+           ELSE 'ZALOPAY'
        END,
        CASE o.status
            WHEN 'PENDING_CONFIRMATION' THEN 'PENDING'

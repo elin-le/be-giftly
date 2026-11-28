@@ -6,6 +6,7 @@ import elin.le.giftly.common.enums.ProductStatus;
 import elin.le.giftly.common.enums.ProductType;
 import elin.le.giftly.common.enums.CustomComponentType;
 import elin.le.giftly.common.enums.VariantStatus;
+import elin.le.giftly.product.entity.Category;
 import elin.le.giftly.product.entity.Product;
 import elin.le.giftly.product.entity.ProductVariant;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,12 @@ class ProductMapperTest {
     void includesVariantDimensionsAndWeightInProductResponse() {
         Product product = Product.builder()
                 .id(UUID.randomUUID())
+                .category(Category.builder()
+                        .id(UUID.randomUUID())
+                        .name("Toys")
+                        .imagePublicId("giftly/categories/toys")
+                        .imageSecureUrl("https://res.cloudinary.com/demo/toys.jpg")
+                        .build())
                 .name("Test product")
                 .productType(ProductType.REGULAR)
                 .customComponentType(CustomComponentType.RIBBON)
@@ -55,6 +62,9 @@ class ProductMapperTest {
         JsonNode variantResponse = productResponse.path("variants").get(0);
 
         assertEquals("RIBBON", productResponse.path("customComponentType").asText());
+        assertEquals("giftly/categories/toys", productResponse.path("category").path("image").path("publicId").asText());
+        assertEquals("https://res.cloudinary.com/demo/toys.jpg",
+                productResponse.path("category").path("image").path("secureUrl").asText());
         assertEquals(25.0, variantResponse.path("length").asDouble());
         assertEquals(15.0, variantResponse.path("width").asDouble());
         assertEquals(8.0, variantResponse.path("height").asDouble());

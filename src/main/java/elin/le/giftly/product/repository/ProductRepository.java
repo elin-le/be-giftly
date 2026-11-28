@@ -54,8 +54,12 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
                     AND (CAST(:maxPrice AS numeric) IS NULL OR v.price <= CAST(:maxPrice AS numeric))
                 )
             )
-            AND (CAST(:cursor AS uuid) IS NULL OR p.id < CAST(:cursor AS uuid))
-            ORDER BY p.id DESC
+            AND (CAST(:cursor AS uuid) IS NULL OR (p.created_at, p.id) < (
+                SELECT cursor_product.created_at, cursor_product.id
+                FROM product cursor_product
+                WHERE cursor_product.id = CAST(:cursor AS uuid)
+            ))
+            ORDER BY p.created_at DESC, p.id DESC
             LIMIT :limit
             """, nativeQuery = true)
     List<Product> searchProductsCursor(

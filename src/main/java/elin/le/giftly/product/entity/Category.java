@@ -22,4 +22,10 @@ public class Category {
     private String name;
 
     private String description;
+
+    @Column(name = "image_public_id", length = 255)
+    private String imagePublicId;
+
+    @Column(name = "image_secure_url", length = 500)
+    private String imageSecureUrl;
 }

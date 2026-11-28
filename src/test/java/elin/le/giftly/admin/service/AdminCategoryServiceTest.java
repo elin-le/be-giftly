@@ -1,7 +1,9 @@
 package elin.le.giftly.admin.service;
 
 import elin.le.giftly.admin.dto.CreateCategoryRequest;
+import elin.le.giftly.admin.dto.ImageInfo;
 import elin.le.giftly.admin.dto.UpdateCategoryRequest;
+import elin.le.giftly.cloudinary.service.CloudinaryService;
 import elin.le.giftly.exception.model.ResourceNotFoundException;
 import elin.le.giftly.product.entity.Category;
 import elin.le.giftly.product.repository.CategoryRepository;
@@ -32,6 +34,8 @@ class AdminCategoryServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+    @Mock
+    private CloudinaryService cloudinaryService;
 
     @InjectMocks
     private AdminCategoryService adminCategoryService;
@@ -105,6 +109,18 @@ class AdminCategoryServiceTest {
             assertEquals("New Category", result.getName());
             verify(categoryRepository).save(any(Category.class));
         }
+
+        @Test
+        void savesCloudinaryImageMetadata() {
+            ImageInfo image = new ImageInfo("giftly/categories/flowers", "https://res.cloudinary.com/demo/flowers.jpg");
+            when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            Category result = adminCategoryService.createCategory(
+                    new CreateCategoryRequest("Flowers", "Flower gifts", image));
+
+            assertEquals(image.publicId(), result.getImagePublicId());
+            assertEquals(image.secureUrl(), result.getImageSecureUrl());
+        }
     }
 
     @Nested
@@ -137,6 +153,32 @@ class AdminCategoryServiceTest {
         }
 
         @Test
+        void replacingImageDeletesOldCloudinaryAsset() {
+            testCategory.setImagePublicId("giftly/categories/old");
+            testCategory.setImageSecureUrl("https://res.cloudinary.com/demo/old.jpg");
+            when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
+            when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            ImageInfo image = new ImageInfo("giftly/categories/new", "https://res.cloudinary.com/demo/new.jpg");
+
+            Category updated = adminCategoryService.updateCategory(
+                    testCategory.getId(), new UpdateCategoryRequest(null, null, image, false));
+
+            assertEquals(image.publicId(), updated.getImagePublicId());
+            verify(cloudinaryService).deleteImage("giftly/categories/old");
+        }
+
+        @Test
+        void rejectsInsecureCategoryImageUrl() {
+            when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
+
+            assertThrows(elin.le.giftly.exception.model.BadRequestException.class,
+                    () -> adminCategoryService.updateCategory(testCategory.getId(),
+                            new UpdateCategoryRequest(null, null,
+                                    new ImageInfo("giftly/categories/image", "http://example.test/image.jpg"), false)));
+            verify(categoryRepository, never()).save(any(Category.class));
+        }
+
+        @Test
         @DisplayName("Should throw when category not found")
         void shouldThrowWhenNotFound() {
             UUID categoryId = UUID.randomUUID();
@@ -154,18 +196,18 @@ class AdminCategoryServiceTest {
         @Test
         @DisplayName("Should delete category")
         void shouldDeleteCategory() {
-            when(categoryRepository.existsById(testCategory.getId())).thenReturn(true);
+            when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
 
             adminCategoryService.deleteCategory(testCategory.getId());
 
-            verify(categoryRepository).deleteById(testCategory.getId());
+            verify(categoryRepository).delete(testCategory);
         }
 
         @Test
         @DisplayName("Should throw when category not found")
         void shouldThrowWhenNotFound() {
             UUID categoryId = UUID.randomUUID();
-            when(categoryRepository.existsById(categoryId)).thenReturn(false);
+            when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
 
             assertThrows(ResourceNotFoundException.class, () -> adminCategoryService.deleteCategory(categoryId));
         }

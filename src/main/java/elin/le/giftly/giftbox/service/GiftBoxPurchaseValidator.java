@@ -37,6 +37,14 @@ public class GiftBoxPurchaseValidator {
     private final ProductVariantRepository productVariantRepository;
 
     public ValidatedGiftBox validate(UUID configId, UUID userId, int boxQuantity) {
+        return validate(configId, userId, boxQuantity, true);
+    }
+
+    public ValidatedGiftBox validateForSave(UUID configId, UUID userId) {
+        return validate(configId, userId, 1, false);
+    }
+
+    private ValidatedGiftBox validate(UUID configId, UUID userId, int boxQuantity, boolean enforceMinimumContent) {
         if (boxQuantity < 1) {
             throw new BadRequestException("Gift box quantity must be at least 1");
         }
@@ -101,7 +109,7 @@ public class GiftBoxPurchaseValidator {
         if (boxCount != 1) {
             throw new BadRequestException("A custom gift box must contain exactly one box");
         }
-        if (contentQuantity < MIN_CONTENT_QUANTITY) {
+        if (enforceMinimumContent && contentQuantity < MIN_CONTENT_QUANTITY) {
             throw new BadRequestException("A custom gift box requires at least 3 non-accessory items");
         }
         validateStock(stockRequirements);

@@ -96,6 +96,10 @@ Danh mục sản phẩm.
 | `id` | UUID | **PK**, `GenerationType.UUID` | Unique category identifier |
 | `name` | VARCHAR | **NOT NULL** | Tên danh mục |
 | `description` | VARCHAR | NULL | Mô tả danh mục |
+| `image_public_id` | VARCHAR(255) | NULL | Cloudinary public ID |
+| `image_secure_url` | VARCHAR(500) | NULL | Cloudinary HTTPS URL |
+
+Ảnh do FE tải trực tiếp lên Cloudinary; API chỉ nhận và trả metadata `publicId`/`secureUrl`. Migration V24 thêm hai cột ảnh này.
 
 ---
 
@@ -147,7 +151,8 @@ Cấu hình hộp quà tùy chỉnh do người dùng tạo và mua độc lập
 | `user_id` | UUID | **NOT NULL**, FK → `user(id)` | Người tạo config |
 | `created_at` | TIMESTAMP | **NOT NULL**, auto-generated (`@CreationTimestamp`), updatable=false | Thời gian tạo |
 
-Các trường `updated_at`, `review_status`, `review_note`, `capacity_ratio` được dùng cho kiểm duyệt và đánh giá cấu hình.
+Các trường `updated_at`, `review_status`, `review_note`, `capacity_ratio` được dùng cho kiểm duyệt và đánh giá cấu hình. Admin có thể quản lý yêu cầu qua `/api/admin/gift-box-requests`; xóa bị chặn nếu cấu hình đã được dùng trong order item.
+`box_product_id` là cột legacy không còn được ứng dụng sử dụng; V23 cho phép cột này nhận `NULL` vì hộp được lưu bằng variant trong `gift_box_config_item`.
 
 **Quan hệ:**
 - `gift_box_config` (1) → (N) `gift_box_config_item` — `CascadeType.ALL`, `orphanRemoval=true`
@@ -290,6 +295,8 @@ Ghi nhận thanh toán cho đơn hàng.
 | `amount` | NUMERIC(19,2) | **NOT NULL** | Số tiền thanh toán |
 | `paid_at` | TIMESTAMP | NULL | Thời gian thanh toán thành công |
 
+V24 thêm `CHECK (payment_method IN ('COD', 'ZALOPAY'))`; dữ liệu legacy có phương thức khác được chuẩn hóa về `COD` trước khi áp dụng constraint.
+
 ---
 
 ### 7. Reviews
@@ -384,11 +391,8 @@ Migration V20 gộp giá trị URL cũ còn thiếu sang `secure_url`, sau đó 
 
 | Value | Description |
 |-------|-------------|
-| `CREDIT_CARD` | Thẻ tín dụng |
-| `DEBIT_CARD` | Thẻ ghi nợ |
-| `BANK_TRANSFER` | Chuyển khoản ngân hàng |
-| `E_WALLET` | Ví điện tử |
 | `COD` | Thanh toán khi nhận hàng |
+| `ZALOPAY` | ZaloPay |
 
 ### Payment Status (`PaymentStatus`)
 

@@ -8,7 +8,7 @@ Tài liệu API này mô tả đầy đủ tất cả endpoint của hệ thốn
 |---|---|
 | **Base URL** | `http://localhost:8080` |
 | **API Prefix** | `/api` |
-| **Content-Type** | `application/json` (trừ upload ảnh dùng `multipart/form-data`) |
+| **Content-Type** | `application/json`; FE upload ảnh trực tiếp lên Cloudinary và gửi metadata ảnh về API |
 | **CORS** | Cho phép `http://localhost:5173` với credentials |
 | **Xác thực** | JWT Bearer token + HttpOnly cookie (refresh token) |
 | **Database** | PostgreSQL |
@@ -150,10 +150,6 @@ fetch(url, { credentials: 'include' });
 
 | Giá trị | Mô tả |
 |---|---|
-| `CREDIT_CARD` | Thẻ tín dụng |
-| `DEBIT_CARD` | Thẻ ghi nợ |
-| `BANK_TRANSFER` | Chuyển khoản |
-| `E_WALLET` | Ví điện tử |
 | `COD` | Thanh toán khi nhận hàng |
 | `ZALOPAY` | ZaloPay |
 
@@ -437,7 +433,7 @@ GET /api/products
 | `cursor` | String | Không | Con trỏ phân trang |
 | `pageSize` | int | Không | Số lượng (mặc định 20) |
 
-Các bộ lọc được kết hợp đồng thời. `type=CUSTOM` chọn sản phẩm có `isCustomBoxEligible=true`; các bộ lọc giá chọn sản phẩm có ít nhất một variant nằm trong khoảng giá. Dùng `customComponentType=RIBBON` để lấy product variant dùng làm ruy-băng; response chứa `customComponentType` và ảnh của product/variant. Ví dụ: `/api/products?customComponentType=RIBBON`.
+Các bộ lọc được kết hợp đồng thời. `type=CUSTOM` chọn sản phẩm có `isCustomBoxEligible=true`; các bộ lọc giá chọn sản phẩm có ít nhất một variant nằm trong khoảng giá. Dùng `customComponentType=RIBBON` để lấy product variant dùng làm ruy-băng; response chứa `customComponentType` và ảnh của product/variant. Kết quả luôn sắp xếp sản phẩm mới tạo trước (`createdAt DESC`, sau đó `id DESC`); `cursor` vẫn là UUID sản phẩm cuối trang trước. Ví dụ: `/api/products?customComponentType=RIBBON`.
 
 **Response (200):**
 
@@ -457,7 +453,11 @@ Các bộ lọc được kết hợp đồng thời. `type=CUSTOM` chọn sản 
         "isCustomBoxEligible": true,
         "category": {
           "id": "uuid",
-          "name": "Gấu bông"
+          "name": "Gấu bông",
+          "image": {
+            "publicId": "giftly/categories/toys",
+            "secureUrl": "https://res.cloudinary.com/demo/toys.jpg"
+          }
         },
         "images": [
           {
@@ -825,7 +825,11 @@ GET /api/categories
     {
       "id": "uuid",
       "name": "Gấu bông",
-      "description": "Các loại gấu bông"
+      "description": "Các loại gấu bông",
+      "image": {
+        "publicId": "giftly/categories/teddy",
+        "secureUrl": "https://res.cloudinary.com/demo/teddy.jpg"
+      }
     }
   ],
   "timestamp": "2026-11-22T17:00:00"
@@ -957,7 +961,34 @@ GET /api/bundles/variants/{variantId}/gift-box-detail
 
 ---
 
-#### 4.5.5. Mua hộp quà custom (Cần auth)
+#### 4.5.5. Lưu danh sách món custom gift box (Cần auth)
+
+```http
+PUT /api/gift-boxes/{giftBoxId}/items
+```
+
+Gửi toàn bộ danh sách món thường đang chọn; request này thay thế các món thường hiện có trong cấu hình, nhưng giữ nguyên hộp và các component đã chọn. Đây là cấu hình hộp quà riêng, không phải cart. Có thể lưu draft chưa đủ 3 món; mức tối thiểu 3 món không phải phụ kiện/thiệp được kiểm tra khi mua. Mỗi món cần là variant đang bán, đủ tồn kho, đủ điều kiện custom box và vừa sức chứa/khối lượng hộp. Thành phần như hộp, ruy-băng, giấy gói, thiệp được lưu qua API components riêng và tối đa một component cho mỗi loại.
+
+**Request Body:**
+
+```json
+{
+  "items": [
+    { "productVariantId": "variant-uuid-1", "quantity": 2 },
+    { "productVariantId": "variant-uuid-2", "quantity": 1 }
+  ]
+}
+```
+
+Gửi `items: []` để xóa các món thường khỏi cấu hình mà vẫn giữ hộp và component.
+
+**Response (200):** Trả về `GiftBoxResponse` đã lưu, gồm hộp, components, danh sách món, ảnh và tổng giá.
+
+**Lỗi:** `400` nếu variant không phù hợp/không còn bán, số lượng vượt tồn kho, vượt sức chứa/khối lượng hoặc cấu hình không thỏa các ràng buộc; `404` nếu không tìm thấy hộp/variant.
+
+---
+
+#### 4.5.6. Mua hộp quà custom (Cần auth)
 
 ```http
 POST /api/gift-boxes/{giftBoxId}/purchase
@@ -1100,7 +1131,7 @@ POST /api/orders
 }
 ```
 
-**Response (201):**
+**Response (200):**
 
 ```json
 {
@@ -1556,7 +1587,7 @@ POST /api/payments
 }
 ```
 
-`paymentMethod` có thể là: `COD`, `ZALOPAY`, `CREDIT_CARD`, `DEBIT_CARD`, `BANK_TRANSFER`, `E_WALLET`.
+`paymentMethod` chỉ nhận `COD` hoặc `ZALOPAY`.
 
 **Response (201):**
 
@@ -1648,7 +1679,9 @@ POST /api/gift-boxes
 }
 ```
 
-**Response (201):**
+Chọn hộp sẽ tạo cấu hình draft được lưu trên backend ngay lập tức; có thể gửi `items: []` và bỏ `components` nếu chưa chọn món/phụ kiện. Hãy lưu `data.id` để tiếp tục autosave. Cấu hình vẫn còn sau khi đăng xuất/đăng nhập và chỉ bị xóa khi gọi DELETE.
+
+**Response (200):**
 
 ```json
 {
@@ -1677,7 +1710,7 @@ POST /api/gift-boxes
       {
         "id": "uuid",
         "variantId": "uuid",
-        "name": "Gấu bông Teddy",
+        "productName": "Gấu bông Teddy",
         "sku": "SM-RED",
         "price": 50000,
         "quantity": 1,
@@ -1693,27 +1726,58 @@ POST /api/gift-boxes
 
 ---
 
-#### 4.12.2. Lấy danh sách hộp quà của tôi
+#### 4.12.2. Cập nhật toàn bộ draft hộp quà
+
+```
+PUT /api/gift-boxes/{giftBoxId}
+```
+
+Thay thế hộp, toàn bộ component và toàn bộ món thường trong draft nhưng giữ nguyên `giftBoxId`. Gửi các mảng `components` và `items` kể cả khi rỗng; `items: []` xóa món thường, `components: []` bỏ hết phụ kiện/thiệp. Có thể đổi variant hộp bằng request này, không cần xóa rồi tạo cấu hình mới.
+
+**Request Body:**
+
+```json
+{
+  "boxVariantId": "box-variant-uuid",
+  "components": [
+    { "productVariantId": "ribbon-variant-uuid" },
+    { "productVariantId": "card-variant-uuid" }
+  ],
+  "items": [
+    { "productVariantId": "content-variant-uuid", "quantity": 2 }
+  ]
+}
+```
+
+Draft được phép chưa đủ 3 món để autosave trong lúc khách chọn; số lượng tối thiểu 3 món không phải phụ kiện/thiệp chỉ bắt buộc khi mua. Mỗi loại component chỉ nhận một lựa chọn. Backend kiểm tra variant đang bán, eligibility, tồn kho, sức chứa và khối lượng; request không hợp lệ sẽ rollback, giữ nguyên cấu hình trước đó.
+
+**Response (200):** Trả `ApiResponse<GiftBoxResponse>` với cùng `id` và cấu hình mới đã lưu.
+
+---
+
+#### 4.12.3. Lấy danh sách hộp quà của tôi
 
 ```
 GET /api/gift-boxes
 ```
 
-**Response (200):** Trả về `List<GiftBoxResponse>`.
+Danh sách cấu hình/draft đã lưu của user hiện tại. Gọi endpoint này sau khi đăng nhập lại để khôi phục draft; không có thời hạn tự xóa.
+
+**Response (200):** Trả về `ApiResponse<List<GiftBoxResponse>>`.
 
 ---
 
-#### 4.12.3. Lấy chi tiết hộp quà
+#### 4.12.4. Lấy chi tiết hộp quà
 
 ```
 GET /api/gift-boxes/{id}
 ```
 
-**Response (200):** Trả về `GiftBoxResponse`.
+**Response (200):** Trả về `ApiResponse<GiftBoxResponse>`.
 
 ---
 
-#### 4.12.4. Xóa hộp quà
+#### 4.12.5. Xóa hộp quà
 
 ```
 DELETE /api/gift-boxes/{id}
@@ -1730,7 +1794,7 @@ DELETE /api/gift-boxes/{id}
 }
 ```
 
-#### 4.12.5. Thêm/xóa thành phần custom
+#### 4.12.6. Thêm/xóa thành phần custom
 
 `POST /api/gift-boxes/{giftBoxId}/components` nhận `{ "productVariantId": "uuid" }`; backend lấy `customComponentType` từ product và từ chối nếu cấu hình đã có thành phần cùng loại. `DELETE /api/gift-boxes/{giftBoxId}/components/{componentType}` xóa lựa chọn theo loại (không thể xóa `BOX`). Ảnh, SKU và giá được trả kèm trong `GiftBoxResponse`.
 
@@ -1759,6 +1823,8 @@ GET /api/admin/dashboard/stats
     "totalUsers": 200,
     "totalReviews": 150,
     "totalRevenue": 50000000,
+    "averageOrderValue": 250000,
+    "paidOrderCount": 200,
     "pendingOrders": 25,
     "lowStockProducts": 5
   },
@@ -1768,7 +1834,29 @@ GET /api/admin/dashboard/stats
 
 ---
 
-#### 4.13.2. Admin Products
+#### 4.13.2. Admin Analytics
+
+Tất cả số liệu doanh thu chỉ tính payment có trạng thái `PAID`, theo `paidAt`. `from` và `to` là ngày inclusive; mặc định là 30 ngày gần nhất tính đến hôm nay.
+
+**Tổng quan doanh thu và đơn hàng:**
+
+```
+GET /api/admin/analytics/overview?from=2026-11-01&to=2026-11-28
+```
+
+Trả `totalRevenue` (tổng tiền payment đã thu), `averageOrderValue` (trung bình `totalAmount` của các đơn có payment thành công, không phải tiền cọc đã thu), `paidOrderCount`, `totalOrderCount` và `customerCount`.
+
+**Doanh thu từng ngày:**
+
+```
+GET /api/admin/analytics/revenue/daily?from=2026-11-01&to=2026-11-28
+```
+
+Trả danh sách ngày liên tục; ngày không có giao dịch có `revenue`, `paymentCount`, `paidOrderCount` bằng 0.
+
+---
+
+#### 4.13.3. Admin Products
 
 **Lấy danh sách:**
 
@@ -2007,7 +2095,7 @@ Tất cả field đều tùy chọn, chỉ cập nhật field được cung cấ
 
 ---
 
-#### 4.13.3. Admin Categories
+#### 4.13.4. Admin Categories
 
 **Lấy danh sách:**
 
@@ -2017,7 +2105,7 @@ GET /api/admin/categories
 
 **Query Parameters:** `page`, `size` (mặc định 20).
 
-**Response (200):** Trả về `Page<Category>`.
+**Response (200):** `ApiResponse<PageResponse<CategoryResponse>>`; mỗi category có `id`, `name`, `description`, `image` (null hoặc `{publicId, secureUrl}`).
 
 ---
 
@@ -2027,7 +2115,7 @@ GET /api/admin/categories
 GET /api/admin/categories/{categoryId}
 ```
 
-**Response (200):** Trả về `Category` entity.
+**Response (200):** `ApiResponse<CategoryResponse>` với `image` là null hoặc metadata Cloudinary `{publicId, secureUrl}`.
 
 ---
 
@@ -2042,11 +2130,15 @@ POST /api/admin/categories
 ```json
 {
   "name": "Gấu bông",
-  "description": "Các loại gấu bông"
+  "description": "Các loại gấu bông",
+  "image": {
+    "publicId": "giftly/categories/teddy",
+    "secureUrl": "https://res.cloudinary.com/demo/teddy.jpg"
+  }
 }
 ```
 
-**Response (201):** Trả về `Category` entity.
+FE upload ảnh trực tiếp lên Cloudinary và gửi metadata; backend không nhận file ảnh. **Response (201):** `ApiResponse<CategoryResponse>`.
 
 ---
 
@@ -2061,11 +2153,16 @@ PUT /api/admin/categories/{categoryId}
 ```json
 {
   "name": "Gấu bông cao cấp",
-  "description": "Gấu bông cao cấp nhập khẩu"
+  "description": "Gấu bông cao cấp nhập khẩu",
+  "image": {
+    "publicId": "giftly/categories/teddy-premium",
+    "secureUrl": "https://res.cloudinary.com/demo/teddy-premium.jpg"
+  },
+  "removeImage": false
 }
 ```
 
-**Response (200):** Trả về `Category` entity đã cập nhật.
+`image` không gửi lên nghĩa là giữ nguyên ảnh; gửi `removeImage: true` để xóa ảnh hiện có (không gửi đồng thời `image`). Backend xóa asset cũ trên Cloudinary khi thay hoặc xóa ảnh. **Response (200):** `ApiResponse<CategoryResponse>`.
 
 ---
 
@@ -2088,7 +2185,30 @@ DELETE /api/admin/categories/{categoryId}
 
 ---
 
-#### 4.13.4. Admin Orders
+#### 4.13.5. Admin Gift Box Requests
+
+Admin CRUD yêu cầu hộp custom trên cấu hình do khách tạo; mọi endpoint cần role `ADMIN`.
+
+- `POST /api/admin/gift-box-requests`: tạo cấu hình thay mặt khách, body gồm `customerId`, `boxVariantId`, `components` và `items`; trả `201` với `AdminGiftBoxRequestResponse`.
+- `GET /api/admin/gift-box-requests?status=PENDING&page=0&size=20`: phân trang, mặc định mới nhất trước; `status` là tùy chọn.
+- `GET /api/admin/gift-box-requests/{requestId}`: lấy request cùng customer ID/email, trạng thái duyệt và cấu hình hộp.
+- `PUT /api/admin/gift-box-requests/{requestId}`: thay toàn bộ `boxVariantId`, `components`, `items`; dùng chung validator sức chứa, tồn kho và loại sản phẩm. Sau khi thay cấu hình, status trở về `PENDING` và xóa ghi chú duyệt.
+- `PATCH /api/admin/gift-box-requests/{requestId}/review`: cập nhật trạng thái và ghi chú.
+
+```json
+{
+  "status": "REVISION_REQUIRED",
+  "note": "Vui lòng chọn lại ruy-băng"
+}
+```
+
+- `DELETE /api/admin/gift-box-requests/{requestId}`: xóa request chưa được dùng trong đơn hàng; nếu đã được tham chiếu bởi order item, backend từ chối để bảo toàn lịch sử.
+
+Response chi tiết có dạng `ApiResponse<AdminGiftBoxRequestResponse>`; danh sách là `ApiResponse<PageResponse<AdminGiftBoxRequestResponse>>`. Khách tự tạo cấu hình qua `POST /api/gift-boxes`.
+
+---
+
+#### 4.13.6. Admin Orders
 
 **Lấy danh sách:**
 
@@ -2194,7 +2314,7 @@ PATCH /api/admin/orders/{orderId}/status
 
 ---
 
-#### 4.13.5. Admin Reviews
+#### 4.13.7. Admin Reviews
 
 **Lấy danh sách:**
 
@@ -2247,7 +2367,7 @@ DELETE /api/admin/reviews/{reviewId}
 
 ---
 
-#### 4.13.6. Admin Users
+#### 4.13.8. Admin Users
 
 **Lấy danh sách:**
 
@@ -2363,7 +2483,7 @@ DELETE /api/admin/users/{userId}
 
 ---
 
-#### 4.13.6. Admin Bundle Options
+#### 4.13.9. Admin Bundle Options
 
 Quản lý bundle option groups và components cho gift box variants.
 
@@ -2550,7 +2670,7 @@ GET /api/admin/bundle/variants/{variantId}/components
 
 ---
 
-#### 4.13.7. Ảnh chung sản phẩm (Common Images)
+#### 4.13.10. Ảnh chung sản phẩm (Common Images)
 
 Khi tạo hoặc cập nhật sản phẩm, FE có thể gửi danh sách ảnh chung (`commonImages`) ở level product, riêng biệt với ảnh của từng variant.
 
@@ -2731,7 +2851,7 @@ const getProducts = async () => {
 6. Product **không có** field `price` ở level product — price thuộc về ProductVariant.
 7. Khi tạo sản phẩm, field `variants` là **bắt buộc** phải có trong request body.
 8. `status` trong variant phải là `AVAILABLE`, `OUT_OF_STOCK`, hoặc `DISCONTINUED` (enum VariantStatus).
-9. Payment methods hỗ trợ: `COD`, `ZALOPAY`, `CREDIT_CARD`, `DEBIT_CARD`, `BANK_TRANSFER`, `E_WALLET`.
+9. Payment methods hỗ trợ: `COD` và `ZALOPAY`.
 10. Bundle APIs (`/api/bundles/**`) **không cần auth** — public access.
 11. Review được tạo với status `PENDING` và cần admin duyệt.
 12. Swagger UI có sẵn tại `http://localhost:8080/swagger-ui.html`.
