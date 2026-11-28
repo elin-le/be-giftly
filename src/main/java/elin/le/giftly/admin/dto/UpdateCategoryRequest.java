@@ -6,9 +6,9 @@ public record UpdateCategoryRequest(
     String name,
     String description,
     @Valid ImageInfo image,
-    boolean removeImage
+    Boolean removeImage
 ) {
     public UpdateCategoryRequest(String name, String description) {
-        this(name, description, null, false);
+        this(name, description, null, Boolean.FALSE);
     }
 }

@@ -55,7 +55,8 @@ public class AdminCategoryService {
         if (request.description() != null) {
             category.setDescription(request.description());
         }
-        if (request.image() != null && request.removeImage()) {
+        boolean removeImage = Boolean.TRUE.equals(request.removeImage());
+        if (request.image() != null && removeImage) {
             throw new BadRequestException("Provide an image or set removeImage, not both");
         }
         if (request.image() != null) {
@@ -64,7 +65,7 @@ public class AdminCategoryService {
             if (previousPublicId != null && !previousPublicId.equals(request.image().publicId())) {
                 cloudinaryService.deleteImage(previousPublicId);
             }
-        } else if (request.removeImage()) {
+        } else if (removeImage) {
             if (category.getImagePublicId() != null) {
                 cloudinaryService.deleteImage(category.getImagePublicId());
             }

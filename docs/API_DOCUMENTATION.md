@@ -2162,7 +2162,7 @@ PUT /api/admin/categories/{categoryId}
 }
 ```
 
-`image` không gửi lên nghĩa là giữ nguyên ảnh; gửi `removeImage: true` để xóa ảnh hiện có (không gửi đồng thời `image`). Backend xóa asset cũ trên Cloudinary khi thay hoặc xóa ảnh. **Response (200):** `ApiResponse<CategoryResponse>`.
+`image` không gửi lên nghĩa là giữ nguyên ảnh; gửi `removeImage: true` để xóa ảnh hiện có (không gửi đồng thời `image`). `removeImage` bị bỏ qua hoặc có giá trị `null`/`false` đều được hiểu là không xóa ảnh. Backend xóa asset cũ trên Cloudinary khi thay hoặc xóa ảnh. **Response (200):** `ApiResponse<CategoryResponse>`.
 
 ---
 

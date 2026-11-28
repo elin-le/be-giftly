@@ -153,6 +153,21 @@ class AdminCategoryServiceTest {
         }
 
         @Test
+        void nullRemoveImageKeepsExistingImage() {
+            testCategory.setImagePublicId("giftly/categories/current");
+            testCategory.setImageSecureUrl("https://res.cloudinary.com/demo/current.jpg");
+            when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
+            when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            Category updated = adminCategoryService.updateCategory(
+                    testCategory.getId(), new UpdateCategoryRequest(null, null, null, null));
+
+            assertEquals("giftly/categories/current", updated.getImagePublicId());
+            assertEquals("https://res.cloudinary.com/demo/current.jpg", updated.getImageSecureUrl());
+            verify(cloudinaryService, never()).deleteImage(anyString());
+        }
+
+        @Test
         void replacingImageDeletesOldCloudinaryAsset() {
             testCategory.setImagePublicId("giftly/categories/old");
             testCategory.setImageSecureUrl("https://res.cloudinary.com/demo/old.jpg");
